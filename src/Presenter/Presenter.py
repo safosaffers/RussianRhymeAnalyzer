@@ -39,7 +39,7 @@ class Presenter(QObject):
         self._mode = None          # 'gen' | 'eval'
         self._eval_text = ""
 
-        self.v.set_llm_available(self.m.llm_available)
+        self.v.set_llm_available(self.m.llm_available, self.m.llm_name, self.m.provider)
         self.v.btn_generate.clicked.connect(self.on_generate)
         self.v.btn_evaluate.clicked.connect(self.on_evaluate)
         self.v.candidate_selected.connect(self.on_select)
@@ -84,7 +84,7 @@ class Presenter(QObject):
         use_llm = self.v.use_llm()
         method = self.v.rhyme_method()
         self._mode = "gen"
-        src = "ИИ (Claude)" if use_llm else "корпус классики"
+        src = self.m.llm_name if use_llm else "корпус классики"
         det = "Юкава" if method == "yukawa" else "RPST"
         note = " (первый запуск грузит модели RPST ~15–30 с)" if method == "rpst" else ""
         self.v.set_status(f"Генерация ({src}), детектор: {det}…{note}")

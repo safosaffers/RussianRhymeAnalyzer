@@ -92,7 +92,7 @@ class View(QWidget):
         form.addRow("Размер:", self.cb_meter)
         form.addRow("Рифмовка:", self.cb_scheme)
         form.addRow("Кандидатов (N):", self.sb_n)
-        self.cb_llm = QCheckBox("Генерировать через ИИ (Claude)")
+        self.cb_llm = QCheckBox("Генерировать через ИИ")
         form.addRow(self.cb_llm)
         self.btn_generate = QPushButton("Сгенерировать")
         left.addWidget(gb)
@@ -221,12 +221,21 @@ class View(QWidget):
     def use_llm(self): return self.cb_llm.isChecked()
     def eval_text(self): return self.pte_input.toPlainText()
 
-    def set_llm_available(self, available: bool):
+    def set_llm_available(self, available: bool, name: str = "", provider: str = "anthropic"):
+        hint = {"gemini": ("GEMINI_API_KEY", "openai"),
+                "deepseek": ("DEEPSEEK_API_KEY", "openai"),
+                "anthropic": ("ANTHROPIC_API_KEY", "anthropic")}
+        if available and name:
+            self.cb_llm.setText(f"Генерировать через {name}")
+            self.cb_llm.setToolTip("")
+        else:
+            env, pkg = hint.get(provider, hint["anthropic"])
+            self.cb_llm.setText(f"Генерировать через ИИ (провайдер: {provider})")
+            self.cb_llm.setToolTip(
+                f"Недоступно. Нужно в этой же сессии: RHYMER_PROVIDER={provider}, "
+                f"переменная {env} и пакет {pkg} (pip install {pkg}).")
         self.cb_llm.setEnabled(available)
         self.cb_llm.setChecked(available)
-        if not available:
-            self.cb_llm.setToolTip("Недоступно: задайте ANTHROPIC_API_KEY "
-                                   "и установите пакет anthropic")
 
     # ---------- статус / занятость ----------
     def set_status(self, msg: str):
