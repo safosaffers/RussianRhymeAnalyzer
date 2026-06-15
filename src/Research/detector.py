@@ -1,3 +1,5 @@
+import os
+import sys
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.colors import Normalize
@@ -5,6 +7,12 @@ from scipy.sparse.linalg import eigsh
 from scipy.sparse import csr_matrix
 import warnings
 warnings.filterwarnings('ignore')
+
+# Фонетическая векторизация слогов вынесена в общий модуль (см. Model/Phonetics.py):
+# схожесть слогов = косинус векторов фонетических признаков (гласная + согласные),
+# вместо прежней «энергии» по порядку буквы в алфавите.
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+from Model.Phonetics import syllable_energy, syllable_similarity
 
 # ============================================================
 # 1. ИСХОДНАЯ СТРУКТУРА: Расслоенное пространство над решеткой
@@ -74,44 +82,6 @@ for i, row in enumerate(syllable_grid):
 # 2. КОЛЛАПС СЛОЯ (РЕНОРМАЛИЗАЦИЯ): слог -> число
 # ============================================================
 
-def syllable_energy(syllable):
-    """
-    Присваиваем слогу «эффективную массу».
-    Правила:
-    - Гласная (фундаментальное поле) даёт базовую энергию по порядку в алфавите.
-    - Согласные (калибровочные заряды) модифицируют энергию:
-      * звонкие (бвгджзлмнр) – множитель 2.0
-      * глухие (пфктшсхцчщ) – множитель 0.5
-    - «ь» и «ъ» дают сдвиг +0.5.
-    Энергия = (база_гласной) * (произведение_множителей) + сдвиги
-    """
-    vowel_energy = {
-        'а': 1.0, 'я': 1.2,
-        'о': 2.0, 'ё': 2.2,
-        'у': 3.0, 'ю': 3.2,
-        'ы': 4.0,
-        'э': 5.0, 'е': 5.2,
-        'и': 6.0
-    }
-    voiced = set('бвгджзлмнр')
-    voiceless = set('пфктшсхцчщ')
-
-    base = 0.0
-    multiplier = 1.0
-    shift = 0.0
-
-    for char in syllable:
-        if char in vowel_energy:
-            base = vowel_energy[char]
-        elif char in voiced:
-            multiplier *= 2.0
-        elif char in voiceless:
-            multiplier *= 0.5
-        elif char in 'ьъ':
-            shift += 0.5
-
-    return base * multiplier + shift
-
 # Формируем матрицу энергий E(i, j)
 n_rows = len(syllable_grid)
 n_cols = max_cols
@@ -141,32 +111,6 @@ def yukawa_kernel(d, lam=0.8):
     if d == 0:
         return 1.0  # самосвязь
     return np.exp(-lam * d) / d
-
-def syllable_similarity(s1, s2):
-    """
-    «Рифма» — схожесть слогов.
-    Меряем по двум компонентам:
-    1. Совпадение гласной (основной тон).
-    2. Совпадение согласных в обрамлении (консонанс).
-    Результат от 0 до 1.
-    """
-    v1 = [c for c in s1 if c in vowels]
-    v2 = [c for c in s2 if c in vowels]
-    c1 = [c for c in s1 if c in consonants]
-    c2 = [c for c in s2 if c in consonants]
-
-    vowel_score = 1.0 if v1 == v2 else 0.0
-
-    # Консонанс: доля общих согласных
-    if not c1 and not c2:
-        cons_score = 1.0
-    elif not c1 or not c2:
-        cons_score = 0.0
-    else:
-        common = len(set(c1) & set(c2))
-        cons_score = common / max(len(set(c1)), len(set(c2)))
-
-    return 0.6 * vowel_score + 0.4 * cons_score
 
 N = len(flat_nodes)
 node_index = {pos: idx for idx, pos in enumerate(flat_nodes)}

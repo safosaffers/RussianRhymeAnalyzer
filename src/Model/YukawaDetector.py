@@ -6,9 +6,9 @@
 import numpy as np
 
 from Model.RhymeEvaluator import RHYME_COLORS
-
-vowels = set("аеёиоуыэюя")
-consonants = set("бвгджзйклмнпрстфхцчшщъь")
+# Фонетическая векторизация слогов (схожесть = косинус векторов признаков).
+from Model.Phonetics import (vowels, consonants, syllable_energy,
+                             syllable_similarity)
 
 
 # ============================================================
@@ -38,29 +38,6 @@ def split_into_syllables(word):
     return syllables
 
 
-def syllable_energy(syllable, voiced_mult=2.0, voiceless_mult=0.5):
-    """«Эффективная масса» слога: гласная — база, согласные — множители."""
-    vowel_energy = {
-        'а': 1.0, 'я': 1.2, 'о': 2.0, 'ё': 2.2, 'у': 3.0, 'ю': 3.2,
-        'ы': 4.0, 'э': 5.0, 'е': 5.2, 'и': 6.0,
-    }
-    voiced = set('бвгджзлмнр')
-    voiceless = set('пфктшсхцчщ')
-    base = 0.0
-    multiplier = 1.0
-    shift = 0.0
-    for char in syllable.lower():
-        if char in vowel_energy:
-            base = vowel_energy[char]
-        elif char in voiced:
-            multiplier *= voiced_mult
-        elif char in voiceless:
-            multiplier *= voiceless_mult
-        elif char in 'ьъ':
-            shift += 0.5
-    return base * multiplier + shift
-
-
 def manhattan_distance(p1, p2):
     return abs(p1[0] - p2[0]) + abs(p1[1] - p2[1])
 
@@ -70,24 +47,6 @@ def yukawa_kernel(d, lam=0.8):
     if d == 0:
         return 1.0
     return np.exp(-lam * d) / d
-
-
-def syllable_similarity(s1, s2, vowel_weight=0.6):
-    """Схожесть слогов: совпадение гласной + доля общих согласных."""
-    s1, s2 = s1.lower(), s2.lower()
-    v1 = [c for c in s1 if c in vowels]
-    v2 = [c for c in s2 if c in vowels]
-    c1 = [c for c in s1 if c in consonants]
-    c2 = [c for c in s2 if c in consonants]
-    vowel_score = 1.0 if v1 == v2 else 0.0
-    if not c1 and not c2:
-        cons_score = 1.0
-    elif not c1 or not c2:
-        cons_score = 0.0
-    else:
-        common = len(set(c1) & set(c2))
-        cons_score = common / max(len(set(c1)), len(set(c2)))
-    return vowel_weight * vowel_score + (1.0 - vowel_weight) * cons_score
 
 
 def apply_resonance(S, gamma=0.3):
