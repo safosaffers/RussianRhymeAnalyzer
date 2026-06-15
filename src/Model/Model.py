@@ -1,8 +1,10 @@
 # Model/Model.py
+import os
 from pathlib import Path
 
 from Model.Generator import StubGenerator, GenParams
 from Model.LLMGenerator import LLMGenerator
+from Model.OpenAICompatGenerator import OpenAICompatGenerator
 from Model.RhymeEvaluator import RhymeEvaluator
 from Model.YukawaDetector import YukawaDetector
 
@@ -20,11 +22,32 @@ class Model:
         self.evaluator = RhymeEvaluator(models_dir)   # models_dir=None -> авто
         self.yukawa = YukawaDetector()
         self.stub = StubGenerator(poems_dir)
-        self.llm = LLMGenerator() if LLMGenerator.available() else None
+        self.llm = self._make_llm()
+
+    @staticmethod
+    def _make_llm():
+        """Выбор ИИ-генератора по RHYMER_PROVIDER (anthropic|gemini|deepseek).
+        None, если для выбранного провайдера нет ключа или пакета SDK."""
+        provider = os.environ.get("RHYMER_PROVIDER", "anthropic").lower()
+        if provider == "anthropic":
+            return LLMGenerator() if LLMGenerator.available() else None
+        if OpenAICompatGenerator.available(provider):
+            return OpenAICompatGenerator(provider)
+        return None
 
     @property
     def llm_available(self) -> bool:
         return self.llm is not None
+
+    @property
+    def llm_name(self) -> str:
+        """Человекочитаемое имя активного ИИ-генератора (для статуса в UI)."""
+        return getattr(self.llm, "label", "ИИ") if self.llm else ""
+
+    @property
+    def provider(self) -> str:
+        """Выбранный провайдер ИИ (для подсказок в UI, даже если ключа нет)."""
+        return os.environ.get("RHYMER_PROVIDER", "anthropic").lower()
 
     def _detector(self, method: str):
         return self.yukawa if method == "yukawa" else self.evaluator

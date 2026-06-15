@@ -22,6 +22,8 @@ class LLMGenerator(Generator):
     Метод improve() — самокоррекция по обратной связи нашего RhymeEvaluator.
     """
 
+    label = "ИИ (Claude)"   # имя для статуса в UI
+
     def __init__(self, model: str = None):
         self.model = model or DEFAULT_MODEL
         self._client = None
