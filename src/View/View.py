@@ -1,12 +1,24 @@
 # View/View.py
 import html
+import os
 
 from PySide6.QtWidgets import (
-    QWidget, QHBoxLayout, QVBoxLayout, QFormLayout, QGroupBox, QLabel,
-    QSpinBox, QDoubleSpinBox, QComboBox, QPushButton, QPlainTextEdit, QTextEdit,
-    QTableWidget, QTableWidgetItem, QHeaderView, QFrame, QCheckBox, QTabWidget,
+    QApplication, QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QFormLayout,
+    QGroupBox, QLabel, QSpinBox, QDoubleSpinBox, QComboBox, QPushButton,
+    QPlainTextEdit, QTextEdit, QTableWidget, QTableWidgetItem, QHeaderView,
+    QFrame, QCheckBox, QTabWidget, QFileDialog, QMessageBox,
 )
+from PySide6.QtGui import QAction
 from PySide6.QtCore import Qt, Signal
+
+from View.SettingsDialog import SettingsDialog, save_settings, apply_to_env
+from Model.Session import save_session, load_session
+
+try:                       # готовая тема оформления (необязательная зависимость)
+    import qdarkstyle
+    _HAS_QDARKSTYLE = True
+except Exception:          # noqa: BLE001
+    _HAS_QDARKSTYLE = False
 
 METERS = ["ямб", "хорей", "дактиль", "амфибрахий", "анапест"]
 SCHEMES = ["ABAB", "AABB", "ABBA"]
@@ -37,24 +49,34 @@ class GrowingTextEdit(QPlainTextEdit):
         self.setFixedHeight(int(h) + self.frameWidth() * 2 + 10)
 
 
-class View(QWidget):
-    """Интерфейс (MVP): вкладки «Генерация» и «Оценка рифм», общая панель
-    сверху (метод определения рифм, статус, тема оформления)."""
+class View(QMainWindow):
+    """Интерфейс (MVP): меню сверху, вкладки «Генерация» и «Оценка рифм»,
+    общая панель (метод определения рифм, статус, тема оформления)."""
 
     candidate_selected = Signal(int)
     tune_changed = Signal()        # изменили константы Юкавы — пересчитать вживую
+    settings_applied = Signal(dict)  # сохранили настройки (провайдер/ключи)
+
+    TITLE = "Каримов Сафо. Rhymer — генерация и оценка рифм"
 
     def __init__(self):
         super().__init__()
-        self.current_theme = "light"
-        self.setWindowTitle("Каримов Сафо. Rhymer — генерация и оценка рифм")
+        self.current_theme = "dark" if _HAS_QDARKSTYLE else "light"
+        self.current_path = None      # путь текущей сессии (.rhymer.json)
+        self._dirty = False
+        self.setWindowTitle(self.TITLE)
         self.resize(1040, 660)
         self._build()
         self.apply_theme()
+        # отмечаем несохранённые правки основного содержимого
+        self.pte_input.textChanged.connect(self._mark_dirty)
+        self.le_theme.textChanged.connect(self._mark_dirty)
 
     # ---------- построение ----------
     def _build(self):
-        root = QVBoxLayout(self)
+        self._build_menus()
+        central = QWidget()
+        root = QVBoxLayout(central)
 
         # верхняя панель: метод рифм (общий), статус, тема оформления
         top = QHBoxLayout()
@@ -74,6 +96,154 @@ class View(QWidget):
         self.tabs.addTab(self._build_gen_tab(), "Генерация")
         self.tabs.addTab(self._build_eval_tab(), "Оценка рифм")
         root.addWidget(self.tabs, 1)
+
+        self.setCentralWidget(central)
+
+    # ---------- меню ----------
+    def _build_menus(self):
+        bar = self.menuBar()
+        m_file = bar.addMenu("Файл")
+        for name, slot, sc in [
+            ("Новая", self._new_session, "Ctrl+N"),
+            ("Открыть…", self._open_session, "Ctrl+O"),
+            ("Сохранить", self._save_session, "Ctrl+S"),
+            ("Сохранить как…", self._save_session_as, "Ctrl+Shift+S"),
+        ]:
+            a = QAction(name, self)
+            a.setShortcut(sc)
+            a.triggered.connect(slot)
+            m_file.addAction(a)
+
+        m_view = bar.addMenu("Вид")
+        self.act_dark = QAction("Тёмная тема", self, checkable=True)
+        self.act_light = QAction("Светлая тема", self, checkable=True)
+        self.act_dark.triggered.connect(lambda: self._set_theme("dark"))
+        self.act_light.triggered.connect(lambda: self._set_theme("light"))
+        m_view.addAction(self.act_dark)
+        m_view.addAction(self.act_light)
+
+        m_settings = bar.addMenu("Настройки")
+        act = QAction("Параметры…", self)
+        act.triggered.connect(self._open_settings)
+        m_settings.addAction(act)
+
+    def _open_settings(self):
+        dlg = SettingsDialog(self)
+        if dlg.exec():
+            cfg = dlg.result_config()
+            save_settings(cfg)
+            apply_to_env(cfg)
+            self.settings_applied.emit(cfg)
+
+    # ---------- сессия (Файл) ----------
+    def session_state(self) -> dict:
+        return {
+            "poem": self.eval_text(),
+            "gen": {
+                "theme": self.theme_text(), "n_lines": self.n_lines(),
+                "meter": self.meter(), "scheme": self.scheme(),
+                "n": self.n_candidates(), "use_llm": self.use_llm(),
+            },
+            "method": self.rhyme_method(),
+            "yukawa": self.yukawa_params(),
+        }
+
+    def apply_session(self, st: dict):
+        self.pte_input.setPlainText(st.get("poem", ""))
+        g = st.get("gen", {})
+        self.le_theme.setPlainText(g.get("theme", ""))
+        self.sb_lines.setValue(int(g.get("n_lines", 4)))
+        self.cb_meter.setCurrentText(g["meter"] if g.get("meter") in METERS else METERS[0])
+        self.cb_scheme.setCurrentText(g["scheme"] if g.get("scheme") in SCHEMES else SCHEMES[0])
+        self.sb_n.setValue(int(g.get("n", 6)))
+        if self.cb_llm.isEnabled():
+            self.cb_llm.setChecked(bool(g.get("use_llm", self.cb_llm.isChecked())))
+        method = st.get("method", "rpst")
+        for i, (_, val) in enumerate(METHODS):
+            if val == method:
+                self.cb_method.setCurrentIndex(i)
+        if st.get("yukawa"):
+            self._apply_yukawa(st["yukawa"])
+
+    def _apply_yukawa(self, yk: dict):
+        spins = {self.yk_lam: "lam", self.yk_gamma: "gamma", self.yk_link: "link_ratio",
+                 self.yk_vowel: "vowel_weight", self.yk_ediv: "energy_div",
+                 self.yk_voiced: "voiced_mult", self.yk_voiceless: "voiceless_mult"}
+        checks = {self.yk_use_distance: "use_distance", self.yk_use_energy: "use_energy"}
+        widgets = list(spins) + list(checks)
+        for w in widgets:
+            w.blockSignals(True)
+        for w, k in spins.items():
+            if k in yk:
+                w.setValue(float(yk[k]))
+        for w, k in checks.items():
+            if k in yk:
+                w.setChecked(bool(yk[k]))
+        for w in widgets:
+            w.blockSignals(False)
+
+    def _new_session(self):
+        self.apply_session({})
+        self.current_path = None
+        self._dirty = False
+        self._update_title()
+        self.set_status("Новая сессия")
+
+    def _open_session(self):
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Открыть сессию", "",
+            "Сессия Rhymer (*.rhymer.json);;JSON (*.json);;Все файлы (*)")
+        if not path:
+            return
+        try:
+            st = load_session(path)
+        except Exception as e:   # noqa: BLE001
+            QMessageBox.warning(self, "Ошибка", f"Не удалось открыть файл:\n{e}")
+            return
+        self.apply_session(st)
+        self.current_path = path
+        self._dirty = False
+        self._update_title()
+        self.set_status("Открыто: " + path)
+
+    def _save_session(self):
+        if not self.current_path:
+            self._save_session_as()
+            return
+        self._write_session(self.current_path)
+
+    def _save_session_as(self):
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Сохранить сессию", "session.rhymer.json",
+            "Сессия Rhymer (*.rhymer.json);;JSON (*.json)")
+        if not path:
+            return
+        if not path.endswith(".json"):
+            path += ".rhymer.json"
+        self._write_session(path)
+
+    def _write_session(self, path: str):
+        try:
+            save_session(path, self.session_state())
+        except Exception as e:   # noqa: BLE001
+            QMessageBox.warning(self, "Ошибка", f"Не удалось сохранить файл:\n{e}")
+            return
+        self.current_path = path
+        self._dirty = False
+        self._update_title()
+        self.set_status("Сохранено: " + path)
+
+    def _mark_dirty(self):
+        if not self._dirty:
+            self._dirty = True
+            self._update_title()
+
+    def _update_title(self):
+        if self.current_path:
+            name = os.path.basename(self.current_path)
+            self.setWindowTitle(f"{'*' if self._dirty else ''}{name} — Rhymer")
+        else:
+            self.setWindowTitle(("*" if self._dirty else "") + self.TITLE)
 
     def _build_gen_tab(self) -> QWidget:
         tab = QWidget(); row = QHBoxLayout(tab)
@@ -319,17 +489,43 @@ class View(QWidget):
 
     # ---------- темы ----------
     def toggle_theme(self):
-        self.current_theme = "dark" if self.current_theme == "light" else "light"
-        self.btn_theme.setText("☀ Светлая тема" if self.current_theme == "dark"
-                               else "🌙 Тёмная тема")
+        self._set_theme("dark" if self.current_theme == "light" else "light")
+
+    def _set_theme(self, theme: str):
+        self.current_theme = theme
         self.apply_theme()
 
     def apply_theme(self):
-        if self.current_theme == "light":
+        """Готовая тема QDarkStyle (тёмная/светлая); при отсутствии пакета —
+        запасные ручные стили. Применяется к QApplication, чтобы попадало во
+        все окна (диалог настроек тоже)."""
+        if _HAS_QDARKSTYLE:
+            try:
+                pal = (qdarkstyle.DarkPalette if self.current_theme == "dark"
+                       else qdarkstyle.LightPalette)
+                qss = qdarkstyle.load_stylesheet(qt_api="pyside6", palette=pal)
+            except TypeError:   # старые версии без palette=
+                qss = qdarkstyle.load_stylesheet(qt_api="pyside6")
+        else:
+            qss = self._manual_qss(self.current_theme)
+        app = QApplication.instance()
+        (app or self).setStyleSheet(qss)
+        self._sync_theme_controls()
+
+    def _sync_theme_controls(self):
+        dark = self.current_theme == "dark"
+        self.btn_theme.setText("☀ Светлая тема" if dark else "🌙 Тёмная тема")
+        if hasattr(self, "act_dark"):
+            self.act_dark.setChecked(dark)
+            self.act_light.setChecked(not dark)
+
+    @staticmethod
+    def _manual_qss(theme: str) -> str:
+        if theme == "light":
             bg, fg, panel, accent = "#f4f4f6", "#1a1a1a", "#ffffff", "#3a6ea5"
         else:
             bg, fg, panel, accent = "#1e1f22", "#e8e8e8", "#2b2d31", "#5690d6"
-        self.setStyleSheet(f"""
+        return f"""
             QWidget {{ background:{bg}; color:{fg}; font-size:13px; }}
             QGroupBox {{ background:{panel}; border:1px solid {accent};
                          border-radius:8px; margin-top:10px; padding:8px; }}
@@ -344,4 +540,4 @@ class View(QWidget):
                            border-radius:6px; padding:8px; font-weight:bold; }}
             QPushButton:disabled {{ background:#888; }}
             QLabel#status {{ color:{accent}; font-weight:bold; }}
-        """)
+        """

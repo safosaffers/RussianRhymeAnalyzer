@@ -24,6 +24,24 @@ PROVIDERS = {
 }
 
 
+def _extract_json(content: str) -> str:
+    """Достаём JSON из ответа: снимаем markdown-ограждение ```json … ``` и
+    обрезаем по внешним фигурным скобкам, если модель добавила пояснений."""
+    if not content:
+        return ""
+    t = content.strip()
+    if t.startswith("```"):
+        nl = t.find("\n")
+        t = (t[nl + 1:] if nl != -1 else t[3:])
+        if t.endswith("```"):
+            t = t[:-3]
+        t = t.strip()
+    start, end = t.find("{"), t.rfind("}")
+    if start != -1 and end != -1 and end > start:
+        return t[start:end + 1]
+    return t
+
+
 class OpenAICompatGenerator(Generator):
     """Генератор через OpenAI-совместимый endpoint (SDK `openai`).
 
@@ -62,15 +80,34 @@ class OpenAICompatGenerator(Generator):
 
     def _ask(self, user: str, max_tokens: int = 4000) -> dict:
         self._ensure()
-        resp = self._client.chat.completions.create(
+        kwargs = dict(
             model=self.model,
             max_tokens=max_tokens,
             messages=[{"role": "system", "content": SYSTEM},
                       {"role": "user", "content": user}],
             response_format={"type": "json_object"},
         )
-        text = (resp.choices[0].message.content or "{}").strip()
-        return json.loads(text)
+        if self.provider == "gemini":
+            # gemini-2.5-* — «думающие» модели: reasoning-токены берутся из того же
+            # лимита max_tokens и обрезают JSON ("Unterminated string"). Отключаем
+            # размышление (extra_body, чтобы не зависеть от версии SDK).
+            kwargs["extra_body"] = {"reasoning_effort": "none"}
+        resp = self._client.chat.completions.create(**kwargs)
+        choice = resp.choices[0]
+        text = _extract_json(choice.message.content)
+        if not text:
+            raise RuntimeError(
+                f"{self.label}: пустой ответ модели "
+                f"(finish_reason={choice.finish_reason}). Проверьте ключ и имя модели.")
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError as e:
+            if choice.finish_reason == "length":
+                raise RuntimeError(
+                    f"{self.label}: ответ обрезан по лимиту токенов. Уменьшите число "
+                    f"строк/кандидатов или увеличьте лимит.") from e
+            raise RuntimeError(
+                f"{self.label}: не удалось разобрать JSON ответа ({e}).") from e
 
     def generate(self, params: GenParams, n: int) -> list[str]:
         theme = params.theme.strip() or "свободная тема"

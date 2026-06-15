@@ -35,6 +35,10 @@ class Model:
             return OpenAICompatGenerator(provider)
         return None
 
+    def reload_llm(self):
+        """Пересобрать ИИ-генератор (после смены провайдера/ключа в настройках)."""
+        self.llm = self._make_llm()
+
     @property
     def llm_available(self) -> bool:
         return self.llm is not None

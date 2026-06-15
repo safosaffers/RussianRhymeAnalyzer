@@ -9,11 +9,17 @@ from PySide6.QtWidgets import QApplication
 
 from Model.Model import Model
 from View.View import View
+from View.SettingsDialog import ORG, APP, load_settings, apply_to_env
 from Presenter.Presenter import Presenter
 
 
 def main():
     app = QApplication(sys.argv)
+    app.setOrganizationName(ORG)
+    app.setApplicationName(APP)
+    # сохранённые провайдер/ключи -> переменные окружения ДО создания Model
+    apply_to_env(load_settings())
+
     m = Model()
     v = View()
     p = Presenter(m, v)   # noqa: F841 — держит связи сигналов

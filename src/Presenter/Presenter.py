@@ -44,6 +44,14 @@ class Presenter(QObject):
         self.v.btn_evaluate.clicked.connect(self.on_evaluate)
         self.v.candidate_selected.connect(self.on_select)
         self.v.tune_changed.connect(self.on_tune)
+        self.v.settings_applied.connect(self.on_settings)
+
+    # ---------- применение настроек (провайдер/ключи) ----------
+    def on_settings(self, cfg):
+        self.m.reload_llm()
+        self.v.set_llm_available(self.m.llm_available, self.m.llm_name, self.m.provider)
+        ok = "доступен" if self.m.llm_available else "ключ не задан/нет пакета"
+        self.v.set_status(f"Настройки применены: провайдер {self.m.provider} ({ok})")
 
     # ---------- асинхронный запуск ----------
     def _run_async(self, fn):
