@@ -4,7 +4,7 @@
 # без изменения их контракта (они читают os.environ).
 import os
 
-from PySide6.QtCore import QSettings
+from PySide6.QtCore import QSettings, Qt
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QFormLayout, QComboBox, QLineEdit, QLabel,
     QDialogButtonBox,
@@ -57,10 +57,13 @@ def apply_to_env(cfg: dict) -> None:
 class SettingsDialog(QDialog):
     """Провайдер ИИ, API-ключи и модель. Значения сохраняются между запусками."""
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, dark=False):
         super().__init__(parent)
         self.setWindowTitle("Настройки")
         self.setMinimumWidth(440)
+        self._dark = dark
+        self._bg = None
+        self.setAttribute(Qt.WA_StyledBackground, True)
         cfg = load_settings()
 
         root = QVBoxLayout(self)
@@ -93,6 +96,13 @@ class SettingsDialog(QDialog):
         bb.accepted.connect(self.accept)
         bb.rejected.connect(self.reject)
         root.addWidget(bb)
+
+    def paintEvent(self, e):
+        # тот же фон-картинка, что и в главном окне (cover)
+        from View.View import load_bg, paint_cover
+        if self._bg is None:
+            self._bg = load_bg(self._dark)
+        paint_cover(self, self._bg)
 
     def result_config(self) -> dict:
         return {

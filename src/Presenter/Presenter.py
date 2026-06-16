@@ -82,7 +82,8 @@ class Presenter(QObject):
             self._on_evaluated(self._eval_text, result)
 
     def _on_failed(self, msg):
-        self.v.set_status("Ошибка: " + msg)
+        self.v.set_status("Ошибка")
+        self.v.show_error(msg)
 
     # ---------- генерация ----------
     def on_generate(self):

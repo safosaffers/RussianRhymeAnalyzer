@@ -6,19 +6,13 @@ from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QFormLayout,
     QGroupBox, QLabel, QSpinBox, QDoubleSpinBox, QComboBox, QPushButton,
     QPlainTextEdit, QTextEdit, QTableWidget, QTableWidgetItem, QHeaderView,
-    QFrame, QCheckBox, QTabWidget, QFileDialog, QMessageBox,
+    QFrame, QCheckBox, QTabWidget, QFileDialog, QMessageBox, QSizePolicy,
 )
-from PySide6.QtGui import QAction
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QAction, QPainter, QColor, QPixmap
+from PySide6.QtCore import Qt, Signal, QRect
 
 from View.SettingsDialog import SettingsDialog, save_settings, apply_to_env
 from Model.Session import save_session, load_session
-
-try:                       # готовая тема оформления (необязательная зависимость)
-    import qdarkstyle
-    _HAS_QDARKSTYLE = True
-except Exception:          # noqa: BLE001
-    _HAS_QDARKSTYLE = False
 
 METERS = ["ямб", "хорей", "дактиль", "амфибрахий", "анапест"]
 SCHEMES = ["ABAB", "AABB", "ABBA"]
@@ -49,6 +43,73 @@ class GrowingTextEdit(QPlainTextEdit):
         self.setFixedHeight(int(h) + self.frameWidth() * 2 + 10)
 
 
+def load_bg(dark: bool):
+    """Картинка-фон из assets: bgdark.* для тёмной темы, bg.* для светлой."""
+    base = os.path.join(os.path.dirname(__file__), "assets")
+    for name in (("bgdark.png", "bgdark.jpg") if dark else ("bg.png", "bg.jpg")):
+        path = os.path.join(base, name)
+        if os.path.exists(path):
+            pm = QPixmap(path)
+            if not pm.isNull():
+                return pm
+    return None
+
+
+def paint_cover(widget, pix, fallback=QColor("#7C3AED")):
+    """Рисует pix на всё окно в режиме «cover» (заполнить, обрезать края)."""
+    p = QPainter(widget)
+    p.setRenderHint(QPainter.SmoothPixmapTransform)
+    if pix is not None:
+        s = pix.scaled(widget.size(), Qt.KeepAspectRatioByExpanding,
+                       Qt.SmoothTransformation)
+        x = (s.width() - widget.width()) // 2
+        y = (s.height() - widget.height()) // 2
+        p.drawPixmap(widget.rect(), s, QRect(x, y, widget.width(), widget.height()))
+    else:
+        p.fillRect(widget.rect(), fallback)
+    p.end()
+
+
+class DecorBackground(QWidget):
+    """Фон-картинка на всё окно (cover). Светлая/тёмная тема — разные картинки."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setAttribute(Qt.WA_StyledBackground, True)
+        self._pix = load_bg(False)
+
+    def set_dark(self, dark: bool):
+        self._pix = load_bg(dark)
+        self.update()
+
+    def paintEvent(self, e):
+        paint_cover(self, self._pix)
+
+
+class CollapsibleSection(QWidget):
+    """Окошко с шапкой-кнопкой: клик — свернуть/развернуть содержимое."""
+
+    def __init__(self, title, content, expanded=True, parent=None):
+        super().__init__(parent)
+        self._title, self.content = title, content
+        v = QVBoxLayout(self)
+        v.setContentsMargins(0, 0, 0, 0)
+        v.setSpacing(4)
+        self.header = QPushButton()
+        self.header.setObjectName("sect")
+        self.header.setCheckable(True)
+        self.header.setChecked(expanded)
+        self.header.setCursor(Qt.PointingHandCursor)
+        self.header.toggled.connect(self._on)
+        v.addWidget(self.header)
+        v.addWidget(content)
+        self._on(expanded)
+
+    def _on(self, exp):
+        self.content.setVisible(exp)
+        self.header.setText(("▼  " if exp else "▶  ") + self._title)
+
+
 class View(QMainWindow):
     """Интерфейс (MVP): меню сверху, вкладки «Генерация» и «Оценка рифм»,
     общая панель (метод определения рифм, статус, тема оформления)."""
@@ -59,15 +120,20 @@ class View(QMainWindow):
 
     TITLE = "Каримов Сафо. Rhymer — генерация и оценка рифм"
 
+    THEMES = ["light", "dark"]
+
     def __init__(self):
         super().__init__()
-        self.current_theme = "dark" if _HAS_QDARKSTYLE else "light"
+        self.current_theme = "light"
         self.current_path = None      # путь текущей сессии (.rhymer.json)
         self._dirty = False
         self.setWindowTitle(self.TITLE)
-        self.resize(1040, 660)
+        self.resize(1200, 780)
         self._build()
         self.apply_theme()
+        # пустые «легенды рифм» не показываем (иначе висит пустая плашка)
+        self.l_gen_legend.setVisible(False)
+        self.l_eval_legend.setVisible(False)
         # отмечаем несохранённые правки основного содержимого
         self.pte_input.textChanged.connect(self._mark_dirty)
         self.le_theme.textChanged.connect(self._mark_dirty)
@@ -75,8 +141,10 @@ class View(QMainWindow):
     # ---------- построение ----------
     def _build(self):
         self._build_menus()
-        central = QWidget()
-        root = QVBoxLayout(central)
+        self._central = DecorBackground()
+        root = QVBoxLayout(self._central)
+        root.setContentsMargins(22, 14, 22, 22)
+        root.setSpacing(14)
 
         # верхняя панель: метод рифм (общий), статус, тема оформления
         top = QHBoxLayout()
@@ -86,6 +154,8 @@ class View(QMainWindow):
         top.addWidget(self.cb_method)
         top.addSpacing(16)
         self.l_status = QLabel("Готово"); self.l_status.setObjectName("status")
+        # статус не должен растягивать окно под длинный текст
+        self.l_status.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
         top.addWidget(self.l_status, 1)
         self.btn_theme = QPushButton("🌙 Тёмная тема")
         self.btn_theme.clicked.connect(self.toggle_theme)
@@ -97,7 +167,7 @@ class View(QMainWindow):
         self.tabs.addTab(self._build_eval_tab(), "Оценка рифм")
         root.addWidget(self.tabs, 1)
 
-        self.setCentralWidget(central)
+        self.setCentralWidget(self._central)
 
     # ---------- меню ----------
     def _build_menus(self):
@@ -115,12 +185,12 @@ class View(QMainWindow):
             m_file.addAction(a)
 
         m_view = bar.addMenu("Вид")
-        self.act_dark = QAction("Тёмная тема", self, checkable=True)
-        self.act_light = QAction("Светлая тема", self, checkable=True)
-        self.act_dark.triggered.connect(lambda: self._set_theme("dark"))
+        self.act_light = QAction("Светлая", self, checkable=True)
+        self.act_dark = QAction("Тёмная", self, checkable=True)
         self.act_light.triggered.connect(lambda: self._set_theme("light"))
-        m_view.addAction(self.act_dark)
+        self.act_dark.triggered.connect(lambda: self._set_theme("dark"))
         m_view.addAction(self.act_light)
+        m_view.addAction(self.act_dark)
 
         m_settings = bar.addMenu("Настройки")
         act = QAction("Параметры…", self)
@@ -128,7 +198,7 @@ class View(QMainWindow):
         m_settings.addAction(act)
 
     def _open_settings(self):
-        dlg = SettingsDialog(self)
+        dlg = SettingsDialog(self, dark=(self.current_theme == "dark"))
         if dlg.exec():
             cfg = dlg.result_config()
             save_settings(cfg)
@@ -246,11 +316,11 @@ class View(QMainWindow):
             self.setWindowTitle(("*" if self._dirty else "") + self.TITLE)
 
     def _build_gen_tab(self) -> QWidget:
-        tab = QWidget(); row = QHBoxLayout(tab)
+        tab = QWidget(); tab.setObjectName("page"); row = QHBoxLayout(tab)
 
-        # слева: параметры
+        # --- слева: параметры (свор.), кнопка, кандидаты (свор.) ---
         left = QVBoxLayout()
-        gb = QGroupBox("Параметры генерации"); form = QFormLayout(gb)
+        params = QWidget(); params.setObjectName("panel"); form = QFormLayout(params)
         self.le_theme = GrowingTextEdit(min_lines=1, max_lines=6)
         self.le_theme.setPlaceholderText("тема стихотворения: зима, любовь, море…")
         self.sb_lines = QSpinBox(); self.sb_lines.setRange(2, 12); self.sb_lines.setValue(4)
@@ -264,43 +334,56 @@ class View(QMainWindow):
         form.addRow("Кандидатов (N):", self.sb_n)
         self.cb_llm = QCheckBox("Генерировать через ИИ")
         form.addRow(self.cb_llm)
-        self.btn_generate = QPushButton("Сгенерировать")
-        left.addWidget(gb)
-        left.addWidget(self.btn_generate)
-        left.addStretch(1)
+        self.sec_params = CollapsibleSection("Параметры генерации", params)
+        left.addWidget(self.sec_params)
 
-        # справа: результат + кандидаты
-        right = QVBoxLayout()
-        right.addWidget(QLabel("Лучший вариант (рифмы выделены цветом):"))
-        self.te_gen_best = QTextEdit(); self.te_gen_best.setReadOnly(True)
-        self.te_gen_best.setFixedHeight(150)
-        right.addWidget(self.te_gen_best)
-        self.l_gen_metrics = QLabel("—"); self.l_gen_metrics.setWordWrap(True)
-        right.addWidget(self.l_gen_metrics)
-        self.l_gen_legend = QLabel(""); self.l_gen_legend.setWordWrap(True)
-        right.addWidget(self.l_gen_legend)
-        line = QFrame(); line.setFrameShape(QFrame.HLine); right.addWidget(line)
-        right.addWidget(QLabel("Кандидаты (по убыванию качества рифмы):"))
+        self.btn_generate = QPushButton("Сгенерировать")
+        left.addWidget(self.btn_generate)
+
+        # кандидаты — под кнопкой
         self.tbl = QTableWidget(0, 4)
         self.tbl.setHorizontalHeaderLabels(["Текст (1-я строка)", "рифма %", "размер", "схема"])
         self.tbl.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
         self.tbl.setEditTriggers(QTableWidget.NoEditTriggers)
         self.tbl.setSelectionBehavior(QTableWidget.SelectRows)
         self.tbl.cellClicked.connect(lambda r, c: self.candidate_selected.emit(r))
-        right.addWidget(self.tbl, 1)
+        self.sec_candidates = CollapsibleSection(
+            "Кандидаты (по убыванию качества рифмы)", self.tbl)
+        left.addWidget(self.sec_candidates, 1)
 
-        row.addLayout(left, 1); row.addLayout(right, 2)
+        # --- справа: крупное поле «лучший вариант» ---
+        right = QVBoxLayout()
+        right.addWidget(QLabel("Лучший вариант (рифмы выделены цветом):"))
+        self.te_gen_best = QTextEdit(); self.te_gen_best.setReadOnly(True)
+        right.addWidget(self.te_gen_best, 1)
+        self.l_gen_metrics = QLabel("—"); self.l_gen_metrics.setWordWrap(True)
+        right.addWidget(self.l_gen_metrics)
+        self.l_gen_legend = QLabel(""); self.l_gen_legend.setWordWrap(True)
+        right.addWidget(self.l_gen_legend)
+
+        self._gen_row = row
+        row.addLayout(left, 3); row.addLayout(right, 4)
+        # оба окошка свёрнуты → ужать левую колонку, расширить «лучший вариант»
+        self.sec_params.header.toggled.connect(self._update_gen_split)
+        self.sec_candidates.header.toggled.connect(self._update_gen_split)
         return tab
 
+    def _update_gen_split(self):
+        both = (not self.sec_params.content.isVisible()
+                and not self.sec_candidates.content.isVisible())
+        self._gen_row.setStretch(0, 0 if both else 3)
+        self._gen_row.setStretch(1, 1 if both else 4)
+
     def _build_eval_tab(self) -> QWidget:
-        tab = QWidget(); row = QHBoxLayout(tab)
+        tab = QWidget(); tab.setObjectName("page"); row = QHBoxLayout(tab)
 
         left = QVBoxLayout()
         left.addWidget(QLabel("Вставьте стихотворение:"))
         self.pte_input = QPlainTextEdit()
         self.pte_input.setPlaceholderText("одна строка стиха на строку…")
         left.addWidget(self.pte_input, 1)
-        left.addWidget(self._build_yukawa_panel())
+        left.addWidget(CollapsibleSection(
+            "Настройка Юкавы — пересчёт вживую", self._build_yukawa_panel()))
         self.btn_evaluate = QPushButton("Оценить рифмы")
         left.addWidget(self.btn_evaluate)
 
@@ -316,15 +399,15 @@ class View(QMainWindow):
         row.addLayout(left, 1); row.addLayout(right, 1)
         return tab
 
-    # ---------- панель настройки Юкавы (временная) ----------
+    # ---------- панель настройки Юкавы ----------
     def _dspin(self, lo, hi, step, val, decimals=2):
         s = QDoubleSpinBox()
         s.setRange(lo, hi); s.setSingleStep(step); s.setDecimals(decimals); s.setValue(val)
         s.valueChanged.connect(lambda *_: self.tune_changed.emit())
         return s
 
-    def _build_yukawa_panel(self) -> QGroupBox:
-        gb = QGroupBox("Настройка Юкавы (временно) — пересчёт вживую")
+    def _build_yukawa_panel(self) -> QWidget:
+        gb = QWidget(); gb.setObjectName("panel")
         form = QFormLayout(gb)
         self.yk_use_distance = QCheckBox("Экранирование по расстоянию")
         self.yk_use_distance.setChecked(True)
@@ -419,12 +502,18 @@ class View(QMainWindow):
     def set_gen_result(self, text: str, m: dict):
         self.te_gen_best.setHtml(self._poem_html(text, m))
         self.l_gen_metrics.setText(self._fmt_metrics(m))
-        self.l_gen_legend.setText(self._legend_html(m))
+        leg = self._legend_html(m)
+        self.l_gen_legend.setText(leg); self.l_gen_legend.setVisible(bool(leg))
 
     def set_eval_result(self, text: str, m: dict):
         self.te_eval_best.setHtml(self._poem_html(text, m))
         self.l_eval_metrics.setText(self._fmt_metrics(m))
-        self.l_eval_legend.setText(self._legend_html(m))
+        leg = self._legend_html(m)
+        self.l_eval_legend.setText(leg); self.l_eval_legend.setVisible(bool(leg))
+
+    def show_error(self, msg: str):
+        """Ошибку показываем отдельным окном, а не растягиваем интерфейс."""
+        QMessageBox.critical(self, "Ошибка", msg)
 
     def clear_candidates(self):
         self.tbl.setRowCount(0)
@@ -460,8 +549,8 @@ class View(QMainWindow):
             body = "<br>".join(rows)
         else:
             body = html.escape(text).replace("\n", "<br>")
-        return (f'<div style="font-family:Georgia,serif;font-size:15px;'
-                f'line-height:1.7">{body}</div>')
+        return (f'<div style="font-family:Georgia,serif;font-size:18px;'
+                f'line-height:1.8">{body}</div>')
 
     @staticmethod
     def _legend_html(m: dict) -> str:
@@ -489,55 +578,106 @@ class View(QMainWindow):
 
     # ---------- темы ----------
     def toggle_theme(self):
-        self._set_theme("dark" if self.current_theme == "light" else "light")
+        i = self.THEMES.index(self.current_theme)
+        self._set_theme(self.THEMES[(i + 1) % len(self.THEMES)])
 
     def _set_theme(self, theme: str):
         self.current_theme = theme
         self.apply_theme()
 
     def apply_theme(self):
-        """Готовая тема QDarkStyle (тёмная/светлая); при отсутствии пакета —
-        запасные ручные стили. Применяется к QApplication, чтобы попадало во
-        все окна (диалог настроек тоже)."""
-        if _HAS_QDARKSTYLE:
-            try:
-                pal = (qdarkstyle.DarkPalette if self.current_theme == "dark"
-                       else qdarkstyle.LightPalette)
-                qss = qdarkstyle.load_stylesheet(qt_api="pyside6", palette=pal)
-            except TypeError:   # старые версии без palette=
-                qss = qdarkstyle.load_stylesheet(qt_api="pyside6")
-        else:
-            qss = self._manual_qss(self.current_theme)
+        """Светлая/тёмная: разные фон-картинки и палитры (тёмная — тёмные блоки
+        ввода и кроваво-красные кнопки). QSS — на всё приложение."""
+        dark = self.current_theme == "dark"
         app = QApplication.instance()
-        (app or self).setStyleSheet(qss)
+        (app or self).setStyleSheet(self._app_qss(dark))
+        if hasattr(self, "_central"):
+            self._central.set_dark(dark)
         self._sync_theme_controls()
 
     def _sync_theme_controls(self):
         dark = self.current_theme == "dark"
-        self.btn_theme.setText("☀ Светлая тема" if dark else "🌙 Тёмная тема")
-        if hasattr(self, "act_dark"):
-            self.act_dark.setChecked(dark)
+        self.btn_theme.setText("☀ Светлая" if dark else "🌙 Тёмная")
+        if hasattr(self, "act_light"):
             self.act_light.setChecked(not dark)
+            self.act_dark.setChecked(dark)
 
     @staticmethod
-    def _manual_qss(theme: str) -> str:
-        if theme == "light":
-            bg, fg, panel, accent = "#f4f4f6", "#1a1a1a", "#ffffff", "#3a6ea5"
+    def _app_qss(dark: bool) -> str:
+        # фон рисует DecorBackground; здесь — панели/блоки/кнопки.
+        NAVY, YELLOW = "#1E293B", "#FBBF24"
+        if dark:
+            PANEL, PANEL_FG = "#23252b", "#E5E7EB"
+            # поля ввода/вывода — заметно темнее панели, чтобы отличались
+            INPUT_BG, INPUT_FG, BORDER = "#141619", "#E8E8E8", "#0b0d10"
+            SECT, GRID = "#0f172a", "#3b3d44"
+            BTN, BTN_H, BTN_P = "#611212", "#761616", "#4D0E0E"   # тёмно-кровавый (−30%)
         else:
-            bg, fg, panel, accent = "#1e1f22", "#e8e8e8", "#2b2d31", "#5690d6"
+            PANEL, PANEL_FG = "#F1EBDD", "#1F2937"                # молочный
+            INPUT_BG, INPUT_FG, BORDER = "#FCF9F2", "#1F2937", "#1E293B"
+            SECT, GRID = "#1E293B", "#D9CFE8"
+            BTN, BTN_H, BTN_P = "#EC4899", "#F472B6", "#DB2777"   # розовый
         return f"""
-            QWidget {{ background:{bg}; color:{fg}; font-size:13px; }}
-            QGroupBox {{ background:{panel}; border:1px solid {accent};
-                         border-radius:8px; margin-top:10px; padding:8px; }}
-            QGroupBox::title {{ subcontrol-origin:margin; left:10px; padding:0 4px; }}
-            QTabWidget::pane {{ border:1px solid {accent}; border-radius:6px; }}
-            QTabBar::tab {{ background:{panel}; padding:8px 18px; margin-right:2px;
-                            border-top-left-radius:6px; border-top-right-radius:6px; }}
-            QTabBar::tab:selected {{ background:{accent}; color:#ffffff; }}
-            QPlainTextEdit, QTextEdit, QSpinBox, QComboBox, QTableWidget
-                {{ background:{panel}; border:1px solid {accent}; border-radius:6px; padding:4px; }}
-            QPushButton {{ background:{accent}; color:#ffffff; border:none;
-                           border-radius:6px; padding:8px; font-weight:bold; }}
-            QPushButton:disabled {{ background:#888; }}
-            QLabel#status {{ color:{accent}; font-weight:bold; }}
+            * {{ font-size: 15px; }}
+            QWidget#page {{ background: transparent; }}
+            QMenuBar {{ background:{NAVY}; color:#ffffff; font-size:15px; padding:4px; }}
+            QMenuBar::item {{ padding:6px 14px; }}
+            QMenuBar::item:selected {{ background:{BTN}; border-radius:6px; }}
+            QMenu {{ background:{NAVY}; color:#ffffff; font-size:15px; }}
+            QMenu::item:selected {{ background:{BTN}; }}
+
+            /* подписи поверх пёстрого фона — на полупрозрачной тёмной подложке */
+            QLabel {{ color:#ffffff; font-size:16px;
+                      background: rgba(15,23,42,0.80); border-radius:9px;
+                      padding:3px 10px; }}
+            QLabel#status {{ color:{YELLOW}; font-weight:bold; font-size:16px;
+                             background: rgba(15,23,42,0.85); }}
+            QCheckBox {{ color:#ffffff; font-size:15px; spacing:8px; }}
+            QCheckBox::indicator {{ width:22px; height:22px; }}
+
+            /* панель-карточка сворачиваемого окошка */
+            QWidget#panel {{ background:{PANEL}; border:3px solid {BORDER};
+                             border-radius:14px; }}
+            QWidget#panel QLabel {{ color:{PANEL_FG}; font-weight:normal;
+                                    background:transparent; padding:0; }}
+            QWidget#panel QCheckBox {{ color:{PANEL_FG}; }}
+            /* шапка сворачиваемого окошка */
+            QPushButton#sect {{ background:{SECT}; color:#ffffff; border:3px solid {SECT};
+                                border-radius:12px; padding:10px 16px; font-size:16px;
+                                font-weight:bold; text-align:left; }}
+            QPushButton#sect:hover {{ background:#334155; }}
+
+            QPlainTextEdit, QTextEdit, QSpinBox, QDoubleSpinBox, QComboBox,
+            QLineEdit, QTableWidget {{
+                background:{INPUT_BG}; color:{INPUT_FG}; border:3px solid {BORDER};
+                border-radius:12px; padding:8px; font-size:15px;
+                selection-background-color:#7C3AED; }}
+            QTextEdit, QPlainTextEdit {{ font-size:17px; }}
+            QComboBox::drop-down {{ border:none; width:26px; }}
+            /* выпадающий список (выбор метода и т.п.) — свой фон, не сливается с фото */
+            QComboBox QAbstractItemView {{ background:{INPUT_BG}; color:{INPUT_FG};
+                border:2px solid {BORDER}; selection-background-color:{BTN};
+                selection-color:#ffffff; outline:none; }}
+
+            QPushButton {{ background:{BTN}; color:#ffffff; border:3px solid {BORDER};
+                           border-radius:14px; padding:12px 20px; font-size:17px;
+                           font-weight:bold; }}
+            QPushButton:hover {{ background:{BTN_H}; }}
+            QPushButton:pressed {{ background:{BTN_P}; }}
+            QPushButton:disabled {{ background:#9CA3AF; border-color:#6B7280; color:#E5E7EB; }}
+
+            QTabWidget::pane {{ border:3px solid {BORDER}; border-radius:16px;
+                                background:transparent; top:-3px; }}
+            QTabBar::tab {{ background:{PANEL}; color:{PANEL_FG}; padding:12px 28px;
+                            margin-right:8px; border:3px solid {BORDER}; border-bottom:none;
+                            border-top-left-radius:14px; border-top-right-radius:14px;
+                            font-size:16px; font-weight:bold; }}
+            QTabBar::tab:selected {{ background:{YELLOW}; color:{NAVY}; }}
+
+            QHeaderView::section {{ background:{NAVY}; color:#ffffff; padding:8px;
+                                    border:none; font-size:14px; font-weight:bold; }}
+            QTableWidget {{ gridline-color:{GRID}; }}
+            QScrollBar:vertical {{ background:transparent; width:14px; margin:2px; }}
+            QScrollBar::handle:vertical {{ background:{BTN}; border-radius:7px; min-height:36px; }}
+            QScrollBar::add-line, QScrollBar::sub-line {{ height:0; }}
         """
