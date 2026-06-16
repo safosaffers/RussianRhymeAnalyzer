@@ -100,8 +100,11 @@ class Presenter(QObject):
         src = self.m.llm_name if use_llm else "корпус классики"
         det = "Юкава" if method == "yukawa" else "RPST"
         note = " (первый запуск грузит модели RPST ~15–30 с)" if method == "rpst" else ""
+        # Юкаве передаём те же параметры из «Настройка Юкавы», что и на вкладке
+        # «Оценка рифм», — иначе выделения для одного текста расходятся.
+        yk = self.v.yukawa_params() if method == "yukawa" else None
         self.v.set_status(f"Генерация ({src}), детектор: {det}…{note}")
-        self._run_async(lambda: self.m.generate_best(p, n, use_llm, method))
+        self._run_async(lambda: self.m.generate_best(p, n, use_llm, method, yk))
 
     def _on_generated(self, scored):
         self.last_scored = scored
