@@ -1,5 +1,6 @@
 # View/View.py
 import html
+import importlib.util
 import os
 
 from PySide6.QtWidgets import (
@@ -16,7 +17,12 @@ from Model.Session import save_session, load_session
 
 METERS = ["ямб", "хорей", "дактиль", "амфибрахий", "анапест"]
 SCHEMES = ["ABAB", "AABB", "ABBA"]
-METHODS = [("RPST (хвосты)", "rpst"), ("Юкава (мой)", "yukawa")]
+_ALL_METHODS = [("RPST (хвосты)", "rpst"), ("Юкава (мой)", "yukawa")]
+# В облегчённой сборке russian_scansion (и torch) не вшиты — оставляем только Юкаву.
+if importlib.util.find_spec("russian_scansion") is None:
+    METHODS = [m for m in _ALL_METHODS if m[1] != "rpst"]
+else:
+    METHODS = _ALL_METHODS
 
 
 class GrowingTextEdit(QPlainTextEdit):

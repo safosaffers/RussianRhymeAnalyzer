@@ -187,7 +187,11 @@ class RhymeEvaluator:
             self._tool = russian_scansion.create_rpst_instance(models_dir=md)
 
     def evaluate(self, text: str, target_scheme: str = "ABAB") -> dict:
-        self._ensure()
+        try:
+            self._ensure()
+        except ImportError:   # облегчённая сборка без russian_scansion/torch
+            return {**self._empty(),
+                    "error": "RPST недоступен в облегчённой сборке — выберите «Юкава»."}
         lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
         if not lines:
             return self._empty()

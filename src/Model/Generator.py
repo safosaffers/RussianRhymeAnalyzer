@@ -41,6 +41,8 @@ class StubGenerator(Generator):
         self._load()
 
     def _load(self):
+        if not os.path.isdir(self.poems_dir):   # каталог не вшит в сборку
+            return
         for name in sorted(os.listdir(self.poems_dir)):
             path = os.path.join(self.poems_dir, name)
             if not os.path.isfile(path):

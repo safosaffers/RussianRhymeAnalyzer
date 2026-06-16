@@ -5,3 +5,5 @@ diploma/
 analogs/
 *.json
 bkps/
+/build/
+/dist/

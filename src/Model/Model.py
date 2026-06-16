@@ -1,5 +1,7 @@
 # Model/Model.py
+import importlib.util
 import os
+import sys
 from pathlib import Path
 
 from Model.Generator import StubGenerator, GenParams
@@ -18,7 +20,10 @@ class Model:
     """
 
     def __init__(self, poems_dir: str = None, models_dir: str = None):
-        root = Path(__file__).resolve().parents[2]   # корень репозитория __RHYMER
+        if getattr(sys, "frozen", False):            # сборка PyInstaller
+            root = Path(getattr(sys, "_MEIPASS", Path(sys.executable).parent))
+        else:
+            root = Path(__file__).resolve().parents[2]   # корень репозитория __RHYMER
         poems_dir = poems_dir or str(root / "poems")
         self.evaluator = RhymeEvaluator(models_dir)   # models_dir=None -> авто
         self.yukawa = YukawaDetector()
@@ -43,6 +48,12 @@ class Model:
     @property
     def llm_available(self) -> bool:
         return self.llm is not None
+
+    @staticmethod
+    def rpst_available() -> bool:
+        """Есть ли RPST-детектор. В облегчённой сборке (без torch/моделей)
+        пакет russian_scansion не вшит — определяем без его импорта."""
+        return importlib.util.find_spec("russian_scansion") is not None
 
     @property
     def llm_name(self) -> str:
