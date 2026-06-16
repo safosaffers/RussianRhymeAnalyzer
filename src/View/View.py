@@ -43,16 +43,24 @@ class GrowingTextEdit(QPlainTextEdit):
         self.setFixedHeight(int(h) + self.frameWidth() * 2 + 10)
 
 
-def load_bg(dark: bool):
-    """Картинка-фон из assets: bgdark.* для тёмной темы, bg.* для светлой."""
+def _load_pix(*names):
     base = os.path.join(os.path.dirname(__file__), "assets")
-    for name in (("bgdark.png", "bgdark.jpg") if dark else ("bg.png", "bg.jpg")):
+    for name in names:
         path = os.path.join(base, name)
         if os.path.exists(path):
             pm = QPixmap(path)
             if not pm.isNull():
                 return pm
     return None
+
+
+def load_bg(dark: bool):
+    """Картинка-фон из assets: bgdark.* для тёмной темы, bg.* для светлой."""
+    return _load_pix(*(("bgdark.png", "bgdark.jpg") if dark else ("bg.png", "bg.jpg")))
+
+
+def load_error_bg():
+    return _load_pix("bgerror.jpg", "bgerror.png")
 
 
 def paint_cover(widget, pix, fallback=QColor("#7C3AED")):
@@ -84,6 +92,24 @@ class DecorBackground(QWidget):
 
     def paintEvent(self, e):
         paint_cover(self, self._pix)
+
+
+class ErrorBox(QMessageBox):
+    """Окно ошибки: заголовок «Ой-ой....» и свой фон (bgerror.jpg)."""
+
+    def __init__(self, parent, text):
+        super().__init__(parent)
+        self.setWindowTitle("Ой-ой....")
+        self.setIcon(QMessageBox.Critical)
+        self.setText(text)
+        self.setAttribute(Qt.WA_StyledBackground, True)
+        self._bg = load_error_bg()
+
+    def paintEvent(self, e):
+        if self._bg is not None:
+            paint_cover(self, self._bg)
+        else:
+            super().paintEvent(e)
 
 
 class CollapsibleSection(QWidget):
@@ -127,6 +153,7 @@ class View(QMainWindow):
         self.current_theme = "light"
         self.current_path = None      # путь текущей сессии (.rhymer.json)
         self._dirty = False
+        self._llm_ok = False
         self.setWindowTitle(self.TITLE)
         self.resize(1200, 780)
         self._build()
@@ -360,6 +387,12 @@ class View(QMainWindow):
         right.addWidget(self.l_gen_metrics)
         self.l_gen_legend = QLabel(""); self.l_gen_legend.setWordWrap(True)
         right.addWidget(self.l_gen_legend)
+        self.btn_improve = QPushButton("✨ Улучшить рифму (ИИ)")
+        self.btn_improve.setEnabled(False)
+        self.btn_improve.setToolTip("Перерифмовать выбранный вариант: оставить "
+                                    "хорошие рифмы, переписать плохие, проверить "
+                                    "читаемость и форму.")
+        right.addWidget(self.btn_improve)
 
         self._gen_row = row
         row.addLayout(left, 3); row.addLayout(right, 4)
@@ -489,6 +522,8 @@ class View(QMainWindow):
                 f"переменная {env} и пакет {pkg} (pip install {pkg}).")
         self.cb_llm.setEnabled(available)
         self.cb_llm.setChecked(available)
+        self._llm_ok = available
+        self.btn_improve.setEnabled(available)
 
     # ---------- статус / занятость ----------
     def set_status(self, msg: str):
@@ -497,6 +532,7 @@ class View(QMainWindow):
     def set_busy(self, busy: bool):
         self.btn_generate.setEnabled(not busy)
         self.btn_evaluate.setEnabled(not busy)
+        self.btn_improve.setEnabled(not busy and self._llm_ok)
 
     # ---------- результаты ----------
     def set_gen_result(self, text: str, m: dict):
@@ -512,8 +548,8 @@ class View(QMainWindow):
         self.l_eval_legend.setText(leg); self.l_eval_legend.setVisible(bool(leg))
 
     def show_error(self, msg: str):
-        """Ошибку показываем отдельным окном, а не растягиваем интерфейс."""
-        QMessageBox.critical(self, "Ошибка", msg)
+        """Ошибку показываем отдельным окном «Ой-ой....» с фоном bgerror.jpg."""
+        ErrorBox(self, msg).exec()
 
     def clear_candidates(self):
         self.tbl.setRowCount(0)

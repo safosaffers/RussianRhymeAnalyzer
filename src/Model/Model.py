@@ -7,6 +7,7 @@ from Model.LLMGenerator import LLMGenerator
 from Model.OpenAICompatGenerator import OpenAICompatGenerator
 from Model.RhymeEvaluator import RhymeEvaluator
 from Model.YukawaDetector import YukawaDetector
+from Model.RhymeFeedback import rhyme_feedback
 
 
 class Model:
@@ -65,6 +66,23 @@ class Model:
     def evaluate(self, text: str, target_scheme: str = "ABAB",
                  method: str = "rpst", yk_params: dict = None) -> dict:
         return self._score(self._detector(method), text, target_scheme, yk_params)
+
+    def improve_poem(self, text: str, params: GenParams, method: str = "rpst",
+                     yk_params: dict = None):
+        """Ручное улучшение выбранного варианта: оцениваем рифму, помечаем хорошие
+        и плохие окончания и просим ИИ перерифмовать плохие (с проверкой
+        читаемости и формы). Возвращает (улучшенный_текст, метрики) или None."""
+        if not self.llm:
+            return None
+        det = self._detector(method)
+        m = self._score(det, text, params.scheme, yk_params)
+        feedback = rhyme_feedback(m, params.scheme)
+        improved = self.llm.improve(text, feedback, params)
+        if not improved:
+            return None
+        im = self._score(det, improved, params.scheme, yk_params)
+        im["corrected"] = True
+        return improved, im
 
     def generate_best(self, params: GenParams, n: int = 6, use_llm: bool = False,
                       method: str = "rpst", yk_params: dict = None) -> list[tuple[str, dict]]:

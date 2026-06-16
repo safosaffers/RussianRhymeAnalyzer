@@ -36,12 +36,14 @@ class Presenter(QObject):
         self.last_scored: list[tuple[str, dict]] = []
         self._thread = None
         self._worker = None
-        self._mode = None          # 'gen' | 'eval'
+        self._mode = None          # 'gen' | 'eval' | 'improve'
         self._eval_text = ""
+        self._current_gen = None   # выбранный сейчас вариант (текст, метрики)
 
         self.v.set_llm_available(self.m.llm_available, self.m.llm_name, self.m.provider)
         self.v.btn_generate.clicked.connect(self.on_generate)
         self.v.btn_evaluate.clicked.connect(self.on_evaluate)
+        self.v.btn_improve.clicked.connect(self.on_improve)
         self.v.candidate_selected.connect(self.on_select)
         self.v.tune_changed.connect(self.on_tune)
         self.v.settings_applied.connect(self.on_settings)
@@ -78,6 +80,8 @@ class Presenter(QObject):
     def _on_done(self, result):
         if self._mode == "gen":
             self._on_generated(result)
+        elif self._mode == "improve":
+            self._on_improved(result)
         else:
             self._on_evaluated(self._eval_text, result)
 
@@ -103,11 +107,40 @@ class Presenter(QObject):
         self.last_scored = scored
         if scored:
             best_text, best_m = scored[0]
+            self._current_gen = (best_text, best_m)
             self.v.set_gen_result(best_text, best_m)
             self.v.set_candidates(scored)
             self.v.set_status(f"Готово: лучший из {len(scored)} кандидатов")
         else:
             self.v.set_status("Нет кандидатов")
+
+    # ---------- улучшение выбранного варианта через ИИ ----------
+    def on_improve(self):
+        if not self.m.llm_available:
+            self.v.show_error("ИИ недоступен. Задай провайдера и ключ в «Настройки».")
+            return
+        if not self._current_gen:
+            self.v.set_status("Сначала сгенерируй и выбери вариант")
+            return
+        text, _ = self._current_gen
+        p = GenParams(theme=self.v.theme_text(), n_lines=self.v.n_lines(),
+                      meter=self.v.meter(), scheme=self.v.scheme())
+        method = self.v.rhyme_method()
+        yk = self.v.yukawa_params() if method == "yukawa" else None
+        self._mode = "improve"
+        self.v.set_status(f"Улучшаю рифму через {self.m.llm_name}…")
+        self._run_async(lambda: self.m.improve_poem(text, p, method, yk))
+
+    def _on_improved(self, result):
+        if not result:
+            self.v.set_status("ИИ не вернул улучшенный вариант")
+            return
+        text, m = result
+        self._current_gen = (text, m)
+        self.last_scored = [(text, m)] + self.last_scored
+        self.v.set_gen_result(text, m)
+        self.v.set_candidates(self.last_scored)
+        self.v.set_status("Готово: рифма улучшена ИИ (вариант добавлен сверху)")
 
     # ---------- оценка своего текста ----------
     def on_evaluate(self):
@@ -147,4 +180,5 @@ class Presenter(QObject):
     def on_select(self, row):
         if 0 <= row < len(self.last_scored):
             text, m = self.last_scored[row]
+            self._current_gen = (text, m)
             self.v.set_gen_result(text, m)
