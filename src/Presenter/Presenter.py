@@ -139,6 +139,12 @@ class Presenter(QObject):
             self.v.set_status("ИИ не вернул улучшенный вариант")
             return
         text, m = result
+        if m.get("unchanged"):
+            # текст не изменился — не дублируем кандидата и не показываем «новый» %
+            self.v.set_status("ИИ вернул тот же текст без изменений — улучшать нечего "
+                              "или это готовый/классический стих (improve рассчитан "
+                              "на черновики ИИ).")
+            return
         self._current_gen = (text, m)
         self.last_scored = [(text, m)] + self.last_scored
         self.v.set_gen_result(text, m)

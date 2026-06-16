@@ -93,6 +93,10 @@ class Model:
             return None
         im = self._score(det, improved, params.scheme, yk_params)
         im["corrected"] = True
+        # ИИ может вернуть текст без изменений (например, классику из корпуса он
+        # не переписывает). Помечаем, чтобы не показывать «новый» результат с
+        # другим %, который сбивает с толку.
+        im["unchanged"] = improved.strip() == text.strip()
         return improved, im
 
     def generate_best(self, params: GenParams, n: int = 6, use_llm: bool = False,
