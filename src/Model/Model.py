@@ -75,10 +75,10 @@ class Model:
         return det.evaluate(text, scheme)
 
     def evaluate(self, text: str, target_scheme: str = "ABAB",
-                 method: str = "rpst", yk_params: dict = None) -> dict:
+                 method: str = "yukawa", yk_params: dict = None) -> dict:
         return self._score(self._detector(method), text, target_scheme, yk_params)
 
-    def improve_poem(self, text: str, params: GenParams, method: str = "rpst",
+    def improve_poem(self, text: str, params: GenParams, method: str = "yukawa",
                      yk_params: dict = None):
         """Ручное улучшение выбранного варианта: оцениваем рифму, помечаем хорошие
         и плохие окончания и просим ИИ перерифмовать плохие (с проверкой
@@ -96,7 +96,7 @@ class Model:
         return improved, im
 
     def generate_best(self, params: GenParams, n: int = 6, use_llm: bool = False,
-                      method: str = "rpst", yk_params: dict = None) -> list[tuple[str, dict]]:
+                      method: str = "yukawa", yk_params: dict = None) -> list[tuple[str, dict]]:
         """Best-of-N: сгенерировать n кандидатов, оценить выбранным детектором,
         вернуть отсортированными по убыванию rhyme_score (лучший — первый).
 

@@ -17,7 +17,8 @@ from Model.Session import save_session, load_session
 
 METERS = ["ямб", "хорей", "дактиль", "амфибрахий", "анапест"]
 SCHEMES = ["ABAB", "AABB", "ABBA"]
-_ALL_METHODS = [("RPST (хвосты)", "rpst"), ("Юкава (мой)", "yukawa")]
+# Юкава — первой, поэтому она выбрана по умолчанию в выпадающем списке.
+_ALL_METHODS = [("Юкава (мой)", "yukawa"), ("RPST (хвосты)", "rpst")]
 # В облегчённой сборке russian_scansion (и torch) не вшиты — оставляем только Юкаву.
 if importlib.util.find_spec("russian_scansion") is None:
     METHODS = [m for m in _ALL_METHODS if m[1] != "rpst"]
@@ -261,7 +262,7 @@ class View(QMainWindow):
         self.sb_n.setValue(int(g.get("n", 6)))
         if self.cb_llm.isEnabled():
             self.cb_llm.setChecked(bool(g.get("use_llm", self.cb_llm.isChecked())))
-        method = st.get("method", "rpst")
+        method = st.get("method", "yukawa")
         for i, (_, val) in enumerate(METHODS):
             if val == method:
                 self.cb_method.setCurrentIndex(i)
