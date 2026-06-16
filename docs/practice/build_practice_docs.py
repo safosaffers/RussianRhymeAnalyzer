@@ -76,12 +76,28 @@ def md_to_doc(doc, md: str):
             i += 1; continue
 
         if s.startswith('```'):                      # код/диаграмма
+            fence = s[3:].strip().lower()
             i += 1
+            block = []
             while i < N and not lines[i].lstrip().startswith('```'):
-                i += 1
+                block.append(lines[i]); i += 1
             i += 1
-            R.para(doc, "(Диаграмма Ганта (mermaid) — см. файл 02_plan_gantt.md.)"
-                   ).runs[0].italic = True
+            # mermaid-гант -> готовая картинка (img/gantt_vkr.png);
+            # прочий блок (напр. ASCII-схема пайплайна) -> моноширинно, как есть.
+            if fence == "mermaid" and os.path.exists(
+                    os.path.join(R.IMG, "gantt_vkr.png")):
+                R.figure(doc, "gantt_vkr.png",
+                         "Рисунок 1 — Диаграмма Ганта плана работы над ВКР "
+                         "(красным — задания практики с дедлайнами; ромб — защита ВКР)")
+            else:
+                for raw in block:
+                    pp = doc.add_paragraph()
+                    pf = pp.paragraph_format
+                    pf.first_line_indent = Cm(0); pf.left_indent = Cm(0.5)
+                    pf.line_spacing_rule = WD_LINE_SPACING.SINGLE
+                    pf.space_after = Pt(0); pf.space_before = Pt(0)
+                    r = pp.add_run(raw if raw.strip() else " ")
+                    r.font.name = R.MONO; r.font.size = Pt(9)
             continue
 
         if s.startswith('|') and i + 1 < N and set(
