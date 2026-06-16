@@ -67,12 +67,12 @@ def md_to_doc(doc, md: str):
         if s.startswith('### '):
             R.h2(doc, _clean(s[4:])); i += 1; continue
         if s.startswith('## '):
-            R.h1(doc, _clean(s[3:]), page_break=False, toc=False); i += 1; continue
+            R.h1(doc, _clean(s[3:]), page_break=False, toc=True); i += 1; continue
         if s.startswith('# '):
             if first_h1:        # заголовок документа уже на титуле — пропускаем
                 first_h1 = False
             else:
-                R.h1(doc, _clean(s[2:]), page_break=False, toc=False)
+                R.h1(doc, _clean(s[2:]), page_break=False, toc=True)
             i += 1; continue
 
         if s.startswith('```'):                      # код/диаграмма
