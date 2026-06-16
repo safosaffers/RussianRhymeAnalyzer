@@ -15,6 +15,7 @@ src/
     LLMGenerator.py           генератор на Claude API + самокоррекция improve()
     RhymeEvaluator.py         детектор "rpst": обёртка RPST + матчер хвостов
     YukawaDetector.py         детектор "yukawa": авторский алгоритм
+    Phonetics.py              векторизация слогов: схожесть = косинус признаков
     TextConverter.py          утилита препроцессинга текста (вне основного потока)
   View/
     View.py                   QWidget: вкладки «Генерация» / «Оценка рифм»,
@@ -96,7 +97,9 @@ src/
 **Общая палитра** — `RHYME_COLORS` (в `RhymeEvaluator.py`) переиспользуется
 детектором Юкавы, чтобы подсветка выглядела одинаково.
 
-Подробно про оба детектора — в [RHYME_DETECTOR.md](RHYME_DETECTOR.md).
+Подробно про оба детектора — в [RHYME_DETECTOR.md](RHYME_DETECTOR.md);
+про фонетическую векторизацию слогов (ядро схожести в Юкаве) —
+в [SYLLABLE_SIMILARITY.md](SYLLABLE_SIMILARITY.md).
 
 ## Запуск
 
