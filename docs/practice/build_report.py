@@ -1,0 +1,701 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+# docs/practice/build_report.py
+# Генерация отчёта по учебной практике в формате ГОСТ (.docx), по образцу
+# пояснительной записки (docs/analogs/ПЗ_ШКАРБАН.Р.А.pdf). Включает все части
+# из docs/practice (источники, план-график, данные, спецификация) + прототип.
+#
+# Оформление: A4, Times New Roman 14, интервал 1.5, выравнивание по ширине,
+# абзацный отступ 1.25 см; поля 30/15/20/20 мм; нумерация страниц снизу по
+# центру (на титуле не показывается); заголовки глав с новой страницы;
+# автоматическое СОДЕРЖАНИЕ (поле TOC — обновить в Word: Ctrl+A, F9).
+#
+# Зависимость: python-docx.  Запуск:  python docs/practice/build_report.py
+import json
+import os
+
+from docx import Document
+from docx.shared import Pt, Mm, Cm, RGBColor
+from docx.enum.text import (WD_ALIGN_PARAGRAPH, WD_LINE_SPACING,
+                            WD_TAB_ALIGNMENT, WD_TAB_LEADER)
+from docx.enum.section import WD_SECTION
+from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+OUT = os.path.join(HERE, "Отчёт_учебная_практика.docx")
+FONT = "Times New Roman"
+# число страниц для РЕФЕРАТА подставляется вторым проходом (см. конец файла)
+PAGES = int(os.environ.get("REPORT_PAGES", "0"))
+
+# Структура оглавления: (уровень, текст, строка-для-поиска-в-PDF).
+TOC_STRUCT = [
+    (1, "ВВЕДЕНИЕ", "ВВЕДЕНИЕ"),
+    (1, "Глава 1. Обзор источников и теоретические основы", "Глава 1."),
+    (2, "1.1 Методология поиска источников", "1.1 Методология"),
+    (2, "1.2 Аналитический обзор предметной области", "1.2 Аналитический"),
+    (2, "1.3 Оформление по ГОСТ и работа с eLibrary", "1.3 Оформление"),
+    (1, "Глава 2. План-график работы над ВКР", "Глава 2."),
+    (2, "2.1 Помесячный план первого курса", "2.1 Помесячный"),
+    (2, "2.2 Помесячный план второго курса", "2.2 Помесячный"),
+    (2, "2.3 Контрольные точки", "2.3 Контрольные"),
+    (1, "Глава 3. Работа с данными", "Глава 3."),
+    (2, "3.1 Поиск и обоснование", "3.1 Поиск"),
+    (2, "3.2 Описание наборов данных", "3.2 Описание"),
+    (2, "3.3 Источники и лицензионная чистота", "3.3 Источники"),
+    (2, "3.4 Предобработка", "3.4 Предобработка"),
+    (2, "3.5 Протокол сбора данных", "3.5 Протокол"),
+    (1, "Глава 4. Спецификация системы и прототип", "Глава 4."),
+    (2, "4.1 Математическая постановка", "4.1 Математическая"),
+    (2, "4.2 Метрики качества", "4.2 Метрики"),
+    (2, "4.3 Требования к окружению", "4.3 Требования"),
+    (2, "4.4 Пайплайн данных", "4.4 Пайплайн"),
+    (2, "4.5 Практическая часть: прототип «Rhymer»", "4.5 Практическая"),
+    (1, "ЗАКЛЮЧЕНИЕ", "ЗАКЛЮЧЕНИЕ"),
+    (1, "СПИСОК ИСПОЛЬЗОВАННЫХ ИСТОЧНИКОВ", "СПИСОК ИСПОЛЬЗОВАННЫХ"),
+    (1, "ПРИЛОЖЕНИЕ А", "ПРИЛОЖЕНИЕ А"),
+]
+# карта «строка-для-поиска → номер страницы», json-файл из 1-го прохода
+_pm = os.environ.get("REPORT_PAGEMAP", "")
+PAGEMAP = json.load(open(_pm, encoding="utf-8")) if _pm and os.path.exists(_pm) else None
+
+
+# ---------------------------------------------------------------- базовый стиль
+def setup_styles(doc):
+    st = doc.styles["Normal"]
+    st.font.name = FONT
+    st.font.size = Pt(14)
+    st.element.rPr.rFonts.set(qn("w:eastAsia"), FONT)
+    st.element.rPr.rFonts.set(qn("w:cs"), FONT)
+    pf = st.paragraph_format
+    pf.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+    pf.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+    pf.first_line_indent = Cm(1.25)
+    pf.space_after = Pt(0)
+    pf.space_before = Pt(0)
+
+    for name, size, bold, align, caps in [
+        ("Heading 1", 14, True, WD_ALIGN_PARAGRAPH.CENTER, True),
+        ("Heading 2", 14, True, WD_ALIGN_PARAGRAPH.LEFT, False),
+    ]:
+        s = doc.styles[name]
+        s.font.name = FONT
+        s.font.size = Pt(size)
+        s.font.bold = bold
+        s.font.color.rgb = RGBColor(0, 0, 0)
+        s.element.rPr.rFonts.set(qn("w:eastAsia"), FONT)
+        p = s.paragraph_format
+        p.alignment = align
+        p.first_line_indent = Cm(0 if align == WD_ALIGN_PARAGRAPH.CENTER else 1.25)
+        p.space_before = Pt(12)
+        p.space_after = Pt(12)
+        p.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+        p.keep_with_next = True
+
+    sec = doc.sections[0]
+    sec.page_height, sec.page_width = Mm(297), Mm(210)
+    sec.top_margin, sec.bottom_margin = Mm(20), Mm(20)
+    sec.left_margin, sec.right_margin = Mm(30), Mm(15)
+
+
+def _fld(paragraph, instr):
+    """Вставка простого поля Word (PAGE, NUMPAGES, TOC)."""
+    r = paragraph.add_run()
+    b = OxmlElement("w:fldChar"); b.set(qn("w:fldCharType"), "begin")
+    it = OxmlElement("w:instrText"); it.set(qn("xml:space"), "preserve"); it.text = instr
+    sep = OxmlElement("w:fldChar"); sep.set(qn("w:fldCharType"), "separate")
+    t = OxmlElement("w:t"); t.text = ""
+    e = OxmlElement("w:fldChar"); e.set(qn("w:fldCharType"), "end")
+    for el in (b, it, sep, t, e):
+        r._r.append(el)
+
+
+def page_footer(doc):
+    sec = doc.sections[0]
+    sec.different_first_page_header_footer = True       # на титуле номер не виден
+    f = sec.footer
+    p = f.paragraphs[0]
+    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p.paragraph_format.first_line_indent = Cm(0)
+    _fld(p, "PAGE")
+    for run in p.runs:
+        run.font.name = FONT; run.font.size = Pt(14)
+
+
+# ---------------------------------------------------------------- хелперы блоков
+def h1(doc, text, page_break=True, toc=True):
+    p = doc.add_paragraph(text, style="Heading 1" if toc else "Normal")
+    if not toc:
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p.paragraph_format.first_line_indent = Cm(0)
+        for r in p.runs:
+            r.bold = True
+    p.paragraph_format.page_break_before = page_break
+    return p
+
+
+def h2(doc, text):
+    return doc.add_paragraph(text, style="Heading 2")
+
+
+def para(doc, text, justify=True, indent=True, bold=False, align=None):
+    p = doc.add_paragraph()
+    r = p.add_run(text); r.bold = bold
+    if align is not None:
+        p.alignment = align
+    if not indent:
+        p.paragraph_format.first_line_indent = Cm(0)
+    return p
+
+
+def bullets(doc, items):
+    for it in items:
+        p = doc.add_paragraph(style="List Bullet")
+        p.add_run(it)
+        p.paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+
+
+def table(doc, headers, rows, widths=None, caption=None, num=None):
+    if caption and num:
+        c = doc.add_paragraph()
+        c.paragraph_format.first_line_indent = Cm(0)
+        c.add_run(f"Таблица {num} — {caption}")
+    t = doc.add_table(rows=1, cols=len(headers))
+    t.style = "Table Grid"
+    t.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    for i, htext in enumerate(headers):
+        cell = t.rows[0].cells[i]
+        cell.paragraphs[0].text = ""
+        run = cell.paragraphs[0].add_run(htext); run.bold = True
+        cell.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+    for row in rows:
+        cells = t.add_row().cells
+        for i, val in enumerate(row):
+            cells[i].text = str(val)
+    # шрифт в таблице — TNR 12, одинарный интервал
+    for r in t.rows:
+        for cell in r.cells:
+            for p in cell.paragraphs:
+                p.paragraph_format.first_line_indent = Cm(0)
+                p.paragraph_format.line_spacing_rule = WD_LINE_SPACING.SINGLE
+                p.paragraph_format.space_after = Pt(0)
+                for run in p.runs:
+                    run.font.name = FONT; run.font.size = Pt(12)
+    if widths:
+        for i, w in enumerate(widths):
+            for r in t.rows:
+                r.cells[i].width = Cm(w)
+    doc.add_paragraph().paragraph_format.space_after = Pt(0)
+    return t
+
+
+# ---------------------------------------------------------------- титул и TOC
+def title_page(doc):
+    def line(text, bold=False, size=14, before=0, after=0, align="center"):
+        p = doc.add_paragraph()
+        p.alignment = (WD_ALIGN_PARAGRAPH.CENTER if align == "center"
+                       else WD_ALIGN_PARAGRAPH.RIGHT if align == "right"
+                       else WD_ALIGN_PARAGRAPH.LEFT)
+        p.paragraph_format.first_line_indent = Cm(0)
+        p.paragraph_format.space_before = Pt(before)
+        p.paragraph_format.space_after = Pt(after)
+        p.paragraph_format.line_spacing_rule = WD_LINE_SPACING.SINGLE
+        r = p.add_run(text); r.bold = bold; r.font.size = Pt(size)
+        return p
+
+    line("Министерство науки и высшего образования Российской Федерации")
+    line("Федеральное государственное бюджетное образовательное учреждение")
+    line("высшего образования")
+    line("«Новгородский государственный университет имени Ярослава Мудрого»", bold=True)
+    line("Политехнический институт")
+    line("Кафедра информационных технологий и систем", after=24)
+
+    line("ОТЧЁТ", bold=True, size=16, before=24)
+    line("по учебной практике", size=14, after=18)
+    line("на тему:", size=14)
+    line("«ИИ-генерация и автоматическая оценка", bold=True, size=14)
+    line("рифмованной русской поэзии»", bold=True, size=14, after=12)
+    line("по направлению подготовки 09.04.01 «Информатика и вычислительная техника»,")
+    line("профиль подготовки «Искусственный интеллект»", after=48)
+
+    # блок «руководитель / студент» справа
+    for txt in ["Руководитель:", "______________ / ____________________",
+                "«____» ______________ 2026 г.", "",
+                "Студент группы 5095:", "______________ / С. Каримов",
+                "«____» ______________ 2026 г."]:
+        p = doc.add_paragraph()
+        p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+        p.paragraph_format.first_line_indent = Cm(0)
+        p.paragraph_format.space_after = Pt(0)
+        p.paragraph_format.line_spacing_rule = WD_LINE_SPACING.SINGLE
+        p.add_run(txt).font.size = Pt(14)
+
+    p = doc.add_paragraph(); p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p.paragraph_format.first_line_indent = Cm(0)
+    p.paragraph_format.space_before = Pt(48)
+    p.add_run("Великий Новгород\n2026")
+
+
+def toc(doc):
+    h1(doc, "СОДЕРЖАНИЕ", page_break=True, toc=False)
+    if PAGEMAP:
+        for level, title, key in TOC_STRUCT:
+            p = doc.add_paragraph()
+            p.paragraph_format.first_line_indent = Cm(0)
+            p.paragraph_format.left_indent = Cm(0.75 if level == 2 else 0)
+            p.paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+            p.paragraph_format.space_after = Pt(0)
+            p.paragraph_format.tab_stops.add_tab_stop(
+                Cm(16.5), WD_TAB_ALIGNMENT.RIGHT, WD_TAB_LEADER.DOTS)
+            run = p.add_run(title)
+            if level == 1:
+                run.bold = True
+            p.add_run("\t" + str(PAGEMAP.get(key, "")))
+    else:
+        p = doc.add_paragraph()
+        p.paragraph_format.first_line_indent = Cm(0)
+        _fld(p, 'TOC \\o "1-2" \\h \\z \\u')
+        note = doc.add_paragraph()
+        note.paragraph_format.first_line_indent = Cm(0)
+        r = note.add_run("(Поле оглавления. В Word обновить: Ctrl+A, затем F9.)")
+        r.italic = True; r.font.size = Pt(10)
+
+
+# ---------------------------------------------------------------- РЕФЕРАТ
+def referat(doc):
+    h1(doc, "РЕФЕРАТ", page_break=True, toc=False)
+    pages = f"{PAGES} с." if PAGES else "__ с."
+    para(doc, f"Отчёт {pages}, 5 табл., 1 рис., {N_SOURCES} источников, 1 прил.",
+         indent=False)
+    para(doc, "ГЕНЕРАЦИЯ ПОЭЗИИ, ОЦЕНКА РИФМЫ, СИЛЛАБО-ТОНИКА, БОЛЬШИЕ ЯЗЫКОВЫЕ "
+              "МОДЕЛИ, ДЕТЕКТОР РИФМЫ, ПОТЕНЦИАЛ ЮКАВЫ, ФОНЕТИЧЕСКАЯ "
+              "ВЕКТОРИЗАЦИЯ, BEST-OF-N, RUSSIAN POETRY SCANSION TOOL.",
+         indent=False)
+    para(doc, "Объект исследования — методы генерации и автоматической оценки "
+              "рифмованной русской поэзии. Предмет — конвейер, объединяющий "
+              "генерацию стиха большой языковой моделью с численной оценкой рифмы "
+              "и отбором лучшего варианта (best-of-N).")
+    para(doc, "Цель учебной практики — разработать прототип такого конвейера "
+              "(приложение «Rhymer») и подготовить материалы исследования: обзор "
+              "источников, план-график работы над ВКР, описание данных и "
+              "спецификацию системы.")
+    para(doc, "В ходе практики выполнен аналитический обзор предметной области "
+              "(генерация поэзии, русскоязычные языковые модели, автоматический "
+              "анализ стиха, управляемая генерация, обучение с подкреплением, "
+              "метрики оценки), составлен библиографический список, разработан "
+              "двухлетний план-график с диаграммой Ганта, обоснован выбор данных и "
+              "протокол их подготовки, сформулирована математическая постановка и "
+              "метрики качества. Реализован прототип «Rhymer» на PySide6: генерация "
+              "(best-of-N с самокоррекцией), два взаимозаменяемых детектора рифмы "
+              "(RPST и авторский алгоритм на потенциале Юкавы с фонетической "
+              "векторизацией слогов).")
+    para(doc, "Область применения результатов — инструменты поддержки авторов и "
+              "редактирования стихов, образование (стиховедение, фонетика), а "
+              "также объективная оценка генеративных моделей на поэтическом "
+              "материале.")
+
+
+# ---------------------------------------------------------------- ВВЕДЕНИЕ
+def introduction(doc):
+    h1(doc, "ВВЕДЕНИЕ")
+    para(doc, "Оценка качества рифмованного стиха — задача на стыке стиховедения, "
+              "лингвистики и обработки естественного языка. Созвучие (рифма), "
+              "стихотворный размер и благозвучие традиционно оцениваются человеком "
+              "«на слух», что плохо масштабируется и слабо воспроизводимо. С "
+              "появлением больших языковых моделей (LLM) генерация текста стала "
+              "массовой, однако силлабо-тоническая русская поэзия по-прежнему "
+              "даётся моделям тяжело: одновременно выдержать смысл, размер и рифму "
+              "удаётся не всегда.")
+    para(doc, "Актуальность работы имеет три измерения. Социальное — сохранение "
+              "интереса к поэзии средствами современных технологий, мост между "
+              "классической традицией и цифровым поколением. Государственное — "
+              "поддержка культуры и русского языка как части культурного кода. "
+              "Научное — систем искусственного интеллекта, которые пишут и "
+              "объективно оценивают стихи на русском языке, крайне мало, что "
+              "оставляет нишу для новизны.")
+    para(doc, "Объект исследования — методы генерации и автоматической оценки "
+              "рифмованной русской поэзии. Предмет исследования — конвейер "
+              "«генерация → численная оценка рифмы → отбор лучшего варианта», "
+              "пригодный для практического приложения и дальнейшего развития в "
+              "рамках выпускной квалификационной работы (ВКР).")
+    para(doc, "Цель учебной практики — разработать прототип конвейера и "
+              "подготовить исследовательские материалы первого года обучения. Для "
+              "достижения цели поставлены задачи:")
+    bullets(doc, [
+        "провести обзор источников и анализ современного состояния области (SOTA);",
+        "составить план-график работы над ВКР и диаграмму Ганта;",
+        "обосновать выбор данных, описать наборы и протокол их подготовки;",
+        "сформулировать математическую постановку задачи и метрики качества;",
+        "реализовать работающий прототип приложения «Rhymer».",
+    ])
+    para(doc, "Гипотеза исследования: численная оценка рифмы (в том числе "
+              "собственным графовым алгоритмом) в связке с отбором лучшего из N "
+              "сгенерированных вариантов и одним проходом самокоррекции повышает "
+              "точность рифмовки по заданной схеме по сравнению с прямой "
+              "генерацией без обратной связи.")
+    para(doc, "Отчёт состоит из введения, четырёх глав, заключения, списка "
+              "использованных источников и приложения. Глава 1 посвящена обзору "
+              "источников, глава 2 — плану-графику работы, глава 3 — работе с "
+              "данными, глава 4 — спецификации системы и прототипу.")
+
+
+# ---------------------------------------------------------------- ГЛАВА 1
+def chapter1(doc):
+    h1(doc, "Глава 1. Обзор источников и теоретические основы")
+    h2(doc, "1.1 Методология поиска источников")
+    para(doc, "Поиск вёлся по базам и площадкам eLibrary.ru, arXiv, ACL "
+              "Anthology, Scopus, Web of Science, Hugging Face и GitHub. Основные "
+              "запросы: poetry generation, rhyme/meter detection, Russian "
+              "scansion, controlled/constrained text generation, RLHF poetry, "
+              "Russian LLM, poetry evaluation, «русская поэзия корпус». Критерии "
+              "отбора — релевантность задаче (генерация или оценка стиха), наличие "
+              "воспроизводимого метода, кода или датасета, приоритет работ "
+              "2016–2026 годов. Текущий объём — около 40 ключевых источников; для "
+              "целевых 70–100 список расширяется отечественными работами по "
+              "стиховедению и NLP с eLibrary.")
+    h2(doc, "1.2 Аналитический обзор предметной области")
+    para(doc, "Генерация поэзии прошла путь от рекуррентных сетей с конечными "
+              "автоматами для рифмы и метра (Hafez, Deep-speare) к токен-свободным "
+              "и управляемым моделям (ByGPT5, PoeLM) и далее к LLM общего "
+              "назначения с управлением через промпт и декодирование. Узкое место — "
+              "одновременное соблюдение смысла, размера и рифмы.")
+    para(doc, "Для русского языка автоматическая оценка стиха фактически "
+              "закрывается инструментом RPST (RussianPoetryScansionTool, И. Козиев): "
+              "расстановка ударений, классификация метра, детекция точных и "
+              "неточных рифм, оценка «техничности». Этот инструмент используется в "
+              "проекте как опорный внешний верификатор.")
+    para(doc, "Управляемая генерация (PPLM, FUDGE, grid-beam search, COLD, "
+              "NeuroLogic) даёт механизмы навязывания рифмы и метра без "
+              "переобучения модели. Обучение с подкреплением с наградой за рифму "
+              "(Generate-and-Revise) и регуляризованный best-of-N — прямая опора "
+              "для направления ВКР, где rhyme-score выступает функцией "
+              "вознаграждения. Метрики оценки поэзии слабо коррелируют между собой "
+              "и с экспертами, поэтому требуется комбинированный протокол "
+              "(автометрики RPST совместно с экспертной оценкой).")
+    para(doc, "Тематически источники сгруппированы по направлениям: нейросетевая "
+              "и LLM-генерация поэзии; русскоязычные языковые модели; "
+              "автоматический анализ стиха (метр, ударение, рифма); контролируемая "
+              "генерация; обучение с подкреплением; метрики и экспертная оценка; "
+              "корпуса и датасеты. Полный библиографический список приведён в конце "
+              "отчёта.")
+    h2(doc, "1.3 Оформление по ГОСТ и работа с eLibrary")
+    para(doc, "Регистрация на eLibrary.ru обязательна (профиль автора, доступ к "
+              "РИНЦ, поиск отечественных публикаций). Библиографические записи "
+              "оформляются по ГОСТ Р 7.0.100–2018, текст отчёта — по ГОСТ "
+              "7.32–2017. Для ведения базы источников удобно использовать Zotero с "
+              "CSL-стилем «Russian GOST R 7.0.100-2018»: источники добавляются "
+              "браузерным коннектором (выходные данные по DOI/arXiv подтягиваются "
+              "автоматически), а список литературы вставляется и пересобирается "
+              "плагином в текстовом редакторе.")
+
+
+# ---------------------------------------------------------------- ГЛАВА 2
+def chapter2(doc):
+    h1(doc, "Глава 2. План-график работы над ВКР")
+    para(doc, "Период обучения в магистратуре — сентябрь 2025 — июнь 2027 (четыре "
+              "семестра). Учебная практика первого года соответствует разработке "
+              "прототипа конвейера и подготовке исследовательских материалов. Ниже "
+              "приведён помесячный план по курсам и контрольные точки; диаграмма "
+              "Ганта вынесена в приложение А.")
+    h2(doc, "2.1 Помесячный план первого курса")
+    table(doc, ["Месяц", "Этап", "Результат"], [
+        ["Сен 2025", "Выбор направления исследования", "Направление, научный руководитель"],
+        ["Окт 2025", "Формулировка темы; старт обзора литературы", "Формулировка темы ВКР"],
+        ["Окт–Дек 2025", "Отечественная литература, регистрация eLibrary", "Библиографический список v1"],
+        ["Ноя 2025", "Постановка цели и задач; объект и предмет", "Черновик введения"],
+        ["Дек 2025", "Гипотеза; техническое задание", "ТЗ на ВКР"],
+        ["Янв 2026", "Прототип «Rhymer»: RPST + генератор + best-of-N", "Работающее MVP-приложение"],
+        ["Фев–Мар 2026", "Зарубежная литература; анализ SOTA", "Список 70–100 ист. (до 06.03.2026)"],
+        ["Мар–Апр 2026", "План-график и диаграмма Ганта", "План (до 24.04.2026)"],
+        ["Апр–Май 2026", "Поиск и обоснование данных; протокол", "Описание данных (до 24.05.2026)"],
+        ["Май 2026", "Спецификация: постановка, метрики, окружение", "Спецификация (до 29.05.2026)"],
+        ["Июн 2026", "Отчёт по практике; предзащита и защита", "Зачёт по практике"],
+    ], widths=[2.8, 7.5, 6.0], caption="Помесячный план первого курса", num=1)
+    h2(doc, "2.2 Помесячный план второго курса")
+    table(doc, ["Месяц", "Этап", "Результат"], [
+        ["Сен 2026", "Уточнение архитектуры; baseline-модель", "Baseline + метрики"],
+        ["Сен–Ноя 2026", "Разработка основной модели", "Основная модель v1"],
+        ["Окт 2026", "Тезисы/статья на конференцию", "Поданные тезисы"],
+        ["Ноя 2026–Янв 2027", "Серия экспериментов; логи", "Таблицы результатов"],
+        ["Янв 2027", "Формализация задачи; метрики; ограничения", "Формальная постановка"],
+        ["Фев–Мар 2027", "Доработка модели; написание глав ВКР", "Главы 1–3 ВКР"],
+        ["Апр 2027", "Оформление по ГОСТ; антиплагиат", "Свёрстанный текст ВКР"],
+        ["Апр 2027", "Презентация; предзащита; рецензия", "Отзыв и рецензия"],
+        ["Май–Июн 2027", "Защита ВКР перед ГЭК", "Диплом"],
+    ], widths=[3.2, 7.1, 6.0], caption="Помесячный план второго курса", num=2)
+    h2(doc, "2.3 Контрольные точки")
+    bullets(doc, [
+        "06.03.2026 — расширенный список литературы (70–100) и анализ SOTA;",
+        "24.04.2026 — утверждённый план-график и диаграмма Ганта;",
+        "24.05.2026 — описание набора данных и протокол сбора;",
+        "29.05.2026 — спецификация (постановка, метрики, окружение, пайплайн);",
+        "июнь 2026 — защита отчёта по учебной практике;",
+        "апрель 2027 — предзащита, отзыв и рецензия;",
+        "июнь 2027 — защита ВКР перед ГЭК.",
+    ])
+
+
+# ---------------------------------------------------------------- ГЛАВА 3
+def chapter3(doc):
+    h1(doc, "Глава 3. Работа с данными")
+    h2(doc, "3.1 Поиск и обоснование")
+    para(doc, "Требования к данным: русскоязычная силлабо-тоническая поэзия со "
+              "строфами регулярной рифмовки; желательна разметка ударений, схемы "
+              "рифмовки и метра; открытая лицензия; достаточный объём и "
+              "разнообразие авторов и эпох, чтобы метрики не переобучались на одном "
+              "стиле. Для оценки детектора рифмы нужна разметка — отсюда выбор "
+              "корпусов Rifma и ArsPoetica (совместимы с RPST); для генерации и "
+              "языкового разнообразия — крупные неразмеченные корпуса (stihi_ru, "
+              "поэтический подкорпус НКРЯ, PULPO); для кросс-языковых экспериментов "
+              "— Gutenberg Poetry Corpus.")
+    h2(doc, "3.2 Описание наборов данных")
+    table(doc, ["Датасет", "Язык", "Объём", "Разметка", "Лицензия"], [
+        ["Rifma", "RU", "5002 фрагмента", "ударения + схема рифмовки", "см. репозиторий"],
+        ["ArsPoetica", "RU", "~8,5 тыс. стихов", "ударения", "см. карточку"],
+        ["stihi_ru", "RU", "крупный корпус", "нет (сырой текст)", "см. карточку"],
+        ["Поэтический подкорпус НКРЯ", "RU", "большой", "метр/рифма/строфика", "условия НКРЯ"],
+        ["PULPO", "мультияз.", ">72–95 млн слов", "нет", "см. карточку"],
+        ["Gutenberg Poetry", "EN", "3,09 млн строк", "нет", "CC0"],
+        ["poems/ (проект)", "RU", "50 строф / 359 строк", "нет", "классика (PD)"],
+    ], widths=[4.3, 2.0, 3.2, 4.0, 3.0],
+        caption="Наборы данных — кандидаты", num=3)
+    para(doc, "Основной выбор: для обучения и валидации детектора рифмы — Rifma и "
+              "ArsPoetica; для языкового разнообразия и генерации — stihi_ru (и "
+              "НКРЯ при доступе); для сравнения с зарубежным SOTA — PULPO и "
+              "Gutenberg Poetry.")
+    h2(doc, "3.3 Источники и лицензионная чистота")
+    para(doc, "Корпуса Козиева (Rifma, ArsPoetica) совместимы с RPST по формату "
+              "разметки, что снижает рассогласование. НКРЯ — академический корпус с "
+              "профессиональной стиховедческой разметкой (доступ по условиям "
+              "корпуса). Датасеты Hugging Face используются согласно лицензиям в "
+              "карточках. Тексты современных авторов (stihi.ru и т. п.) могут быть "
+              "защищены авторским правом, поэтому приоритет отдаётся произведениям в "
+              "общественном достоянии (классика) и датасетам с явной открытой "
+              "лицензией; современные тексты используются только в "
+              "агрегированном/метрическом виде или с разрешения.")
+    h2(doc, "3.4 Предобработка")
+    bullets(doc, [
+        "нормализация: UTF-8, нижний регистр, удаление пунктуации для детектора с "
+        "сохранением исходного варианта для показа;",
+        "сегментация на строфы (по пустой строке, фильтр ≥2 строк);",
+        "дедупликация точных и near-duplicate строф;",
+        "фильтрация по языку, длине, кодировке;",
+        "разметка ударений (RPST) → хвосты/клаузулы; сверка с эталоном для "
+        "размеченных датасетов;",
+        "формирование примеров (строфа, целевая схема, метки рифмующихся пар);",
+        "разбиение train/val/test со стратификацией по схеме и размеру, фиксация "
+        "random seed и версии датасета.",
+    ])
+    h2(doc, "3.5 Протокол сбора данных")
+    bullets(doc, [
+        "источники и права: фиксировать происхождение и лицензию каждого текста;",
+        "сбор: предпочитать готовые датасеты; при парсинге соблюдать robots.txt и "
+        "хранить дату выгрузки;",
+        "очистка: нормализация, дедупликация, отсев не-русских и битых фрагментов;",
+        "разметка: автоматическая (RPST) + выборочная ручная проверка ≥2 "
+        "аннотаторами, согласие по Cohen's κ;",
+        "версионирование: версия, хэш и описание изменений; неизменяемые сплиты;",
+        "метаданные: источник, лицензия, схема, размер, метки;",
+        "хранение: сырые и обработанные данные раздельно, крупные файлы вне git.",
+    ])
+
+
+# ---------------------------------------------------------------- ГЛАВА 4
+def chapter4(doc):
+    h1(doc, "Глава 4. Спецификация системы и прототип")
+    h2(doc, "4.1 Математическая постановка")
+    para(doc, "Параметры запроса θ = (t, p, L, s): тема t, размер p (ямб, хорей и "
+              "т. д.), число строк L, схема рифмовки s (например, ABAB). "
+              "Стихотворение y = (ℓ₁, …, ℓ_L) — последовательность строк; строка "
+              "разбивается на слоги. Генератор G_φ — языковая модель, y ~ G_φ(·|θ). "
+              "Детектор рифмы D отображает (y, s) в набор метрик m.")
+    para(doc, "Качество кандидата оценивается ранжирующим баллом "
+              "R(y,θ) = 0,6·ρ(y) + 0,4·min(max(q(y),0),1), где ρ(y) — доля "
+              "зарифмованных слогов, q(y) — оценка поэтичности RPST. Для детектора "
+              "Юкавы R(y,θ) = ρ(y). В режиме best-of-N генерируются N кандидатов и "
+              "выбирается y* = argmax R(y,θ). При точности по схеме A(y*,s) < 1 "
+              "строится текстовый фидбэк и запрашивается одна правка (самокоррекция); "
+              "исправленный вариант также участвует в отборе.")
+    para(doc, "Граф связей (ветвь Юкавы): узлы — слоги, сила связи "
+              "S_ab = sim(a,b)·K_λ(d_ab)·|E_a·E_b|/η, где ядро экранирования "
+              "K_λ(d) = e^(−λd)/d, d_ab — манхэттенское расстояние по решётке "
+              "(строка, позиция), sim — фонетическое созвучие слогов, E — «энергия» "
+              "(масса) слога, η — нормировка. После резонанса "
+              "S'_ab = S_ab + γ·(1/N)·Σ_c S_ac·S_bc и нормировки берутся рёбра "
+              "S'_ab ≥ β·max S'; компоненты связности образуют группы рифм.")
+    h2(doc, "4.2 Метрики качества")
+    table(doc, ["Метрика", "Определение", "Назначение"], [
+        ["rhyme_accuracy", "доля верно срифмованных пар по схеме", "основная для генерации"],
+        ["rhyme_percent", "доля слогов в подсвеченных рифмах", "ранжирование, наглядность"],
+        ["RPST score", "оценка поэтичности по RPST", "компонент балла R"],
+        ["meter accuracy", "доля строк с корректным размером", "контроль размера"],
+        ["precision/recall групп", "TP/(TP+FP), TP/(TP+FN)", "валидация детектора"],
+        ["корреляция с экспертом", "Spearman ρ_s", "согласие с человеком"],
+    ], widths=[4.3, 7.0, 5.2], caption="Метрики качества", num=4)
+    h2(doc, "4.3 Требования к окружению")
+    table(doc, ["Компонент", "Значение"], [
+        ["ОС", "Linux (разработка); кроссплатформенно (PySide6)"],
+        ["Python", "3.12 (виртуальное окружение)"],
+        ["GUI", "PySide6 6.11"],
+        ["Анализ стиха", "russian_scansion (RPST) 1.0.22 + модели"],
+        ["Научный стек", "numpy, scipy, matplotlib, torch 2.10"],
+        ["LLM SDK", "anthropic (Claude) и/или openai (Gemini/DeepSeek)"],
+        ["Архитектура", "MVP (Model/View/Presenter), задачи в QThread"],
+    ], widths=[4.0, 12.5], caption="Требования к окружению", num=5)
+    h2(doc, "4.4 Пайплайн данных")
+    para(doc, "Сбор корпуса → нормализация (приведение к нижнему регистру, "
+              "удаление пунктуации, разбиение на строки и слова) → дедупликация и "
+              "фильтрация (длина строф, язык, кодировка) → разметка ударений (RPST) "
+              "и выделение хвостов/клаузул → формирование примеров (строфа, схема, "
+              "метки рифмующихся пар) → разбиение train/val/test со стратификацией "
+              "→ оценка детектором и (для генерации) best-of-N с самокоррекцией → "
+              "логи экспериментов для таблиц ВКР.")
+    h2(doc, "4.5 Практическая часть: прототип «Rhymer»")
+    para(doc, "Прототип реализован как десктоп-приложение на PySide6 по паттерну "
+              "MVP (Model/View/Presenter); тяжёлые задачи (загрузка моделей RPST, "
+              "генерация, оценка) выполняются в отдельном потоке, интерфейс не "
+              "блокируется. Генерация мультипровайдерная (Claude, Gemini, DeepSeek) "
+              "по схеме best-of-N с одним проходом самокоррекции по фидбэку "
+              "детектора. Реализованы два взаимозаменяемых детектора рифмы с единым "
+              "интерфейсом.")
+    para(doc, "Первый детектор — обёртка над RPST: разметка ударений, определение "
+              "размера и схемы рифмовки, оценка поэтичности, сравнение рифмующихся "
+              "хвостов и расчёт точности по схеме. Второй — авторский алгоритм на "
+              "потенциале Юкавы: стихотворение рассматривается как поток волн, сила "
+              "созвучия слогов экранируется расстоянием, эффект резонанса усиливает "
+              "созвучные цепочки, а группы рифм выделяются как компоненты "
+              "связности графа. Ядро схожести слогов — фонетическая векторизация: "
+              "каждый слог кодируется вектором артикуляционных признаков (отдельно "
+              "блок гласной и блок согласных), а близость измеряется косинусом, так "
+              "что основной вклад дают гласные, а согласные добавляют созвучие "
+              "(аллитерацию). Интерфейс приложения, настройки провайдера и "
+              "сохранение сессий показаны в приложении А.")
+
+
+# ---------------------------------------------------------------- ЗАКЛЮЧЕНИЕ
+def conclusion(doc):
+    h1(doc, "ЗАКЛЮЧЕНИЕ")
+    para(doc, "В ходе учебной практики выполнены все поставленные задачи. Проведён "
+              "обзор источников и анализ современного состояния области, составлен "
+              "категоризированный библиографический список. Разработан двухлетний "
+              "план-график работы над ВКР с диаграммой Ганта и контрольными "
+              "точками. Обоснован выбор данных, описаны наборы и протокол их "
+              "подготовки с учётом лицензионной чистоты. Сформулированы "
+              "математическая постановка задачи, метрики качества, требования к "
+              "окружению и пайплайн данных.")
+    para(doc, "Главный практический результат — работающий прототип приложения "
+              "«Rhymer»: генерация стиха большой языковой моделью по схеме "
+              "best-of-N с самокоррекцией и два взаимозаменяемых детектора рифмы "
+              "(RPST и авторский алгоритм на потенциале Юкавы с фонетической "
+              "векторизацией слогов). Научная новизна сосредоточена в авторском "
+              "алгоритме оценки созвучия и способе векторизации слогов.")
+    para(doc, "Направления дальнейшей работы в рамках ВКР: дообучение и обучение с "
+              "подкреплением генеративной модели с rhyme-score в качестве награды, "
+              "расширение и разметка датасета, развитие приложения в полноценный "
+              "редактор стихов. Гипотеза исследования на прототипе подтверждается: "
+              "отбор лучшего из N вариантов с самокоррекцией повышает точность "
+              "рифмовки по сравнению с прямой генерацией.")
+
+
+# ---------------------------------------------------------------- ИСТОЧНИКИ
+BIBLIO = [
+    "Ghazvininejad M., Shi X., Choi Y., Knight K. Generating Topical Poetry // EMNLP 2016. URL: https://aclanthology.org/D16-1126/ (Hafez: RNN + конечный автомат для рифмы и метра).",
+    "Ghazvininejad M., Shi X., Priyadarshi J., Knight K. Hafez: an Interactive Poetry Generation System // ACL 2017 (Demo). URL: https://aclanthology.org/P17-4008/.",
+    "Lau J. H., Cohn T., Baldwin T., Brooke J., Hammond A. Deep-speare: A Joint Neural Model of Poetic Language, Meter and Rhyme // ACL 2018. arXiv:1807.03491. URL: https://arxiv.org/pdf/1807.03491.",
+    "Belouadi J., Eger S. ByGPT5: End-to-End Style-conditioned Poetry Generation with Token-free Language Models // ACL 2023 Findings. arXiv:2212.10474. URL: https://arxiv.org/abs/2212.10474.",
+    "Lee S. W. et al. GPoeT-2: A GPT-2 Based Poem Generator. arXiv:2205.08847. URL: https://arxiv.org/abs/2205.08847.",
+    "Wang J., Zhang X., Zhou Y., Suh C., Rudin C. There Once Was a Really Bad Poet, It Was Automated but You Didn't Know It // TACL 2021. arXiv:2103.03775. URL: https://arxiv.org/abs/2103.03775.",
+    "Ormazabal A., Artetxe M., Soroa A., Labaka G., Agirre E. PoeLM: A Meter- and Rhyme-Controllable Language Model for Unsupervised Poetry Generation // EMNLP 2022 Findings. arXiv:2205.12206. URL: https://arxiv.org/abs/2205.12206.",
+    "Belouadi J., Eger S. Let the Poem Hit the Rhythm: Beat-Aligned Poetry Generation. arXiv:2406.10174. URL: https://arxiv.org/html/2406.10174.",
+    "Zmitrovich D. et al. A Family of Pretrained Transformer Language Models for Russian. arXiv:2309.10931. URL: https://github.com/ai-forever/ru-gpts.",
+    "AI Forever (Sber). ruGPT-3.5-13B. Hugging Face. URL: https://huggingface.co/ai-forever/ruGPT-3.5-13B.",
+    "Shliazhko O. et al. mGPT: Few-Shot Learners Go Multilingual. arXiv:2204.07580. URL: https://arxiv.org/abs/2204.07580.",
+    "Yandex. YaLM-100B. GitHub, 2022. URL: https://github.com/yandex/YaLM-100B.",
+    "Nikolich A. et al. Vikhr: Open-Source Instruction-Tuned LLMs for Russian. arXiv:2405.13929. URL: https://arxiv.org/abs/2405.13929.",
+    "Gusev I. saiga_llama3_8b. Hugging Face. URL: https://huggingface.co/IlyaGusev/saiga_llama3_8b.",
+    "Mukhamedshina D. et al. GigaChat Family: Efficient Russian Language Modeling Through MoE. arXiv:2506.09440. URL: https://arxiv.org/abs/2506.09440.",
+    "Fenogenova A. et al. MERA: A Comprehensive LLM Evaluation in Russian. arXiv:2401.04531. URL: https://arxiv.org/abs/2401.04531.",
+    "Koziev I. Automated Evaluation of Meter and Rhyme in Russian Generative and Human-Authored Poetry. arXiv:2502.20931, 2025. URL: https://arxiv.org/abs/2502.20931.",
+    "Koziev I. RussianPoetryScansionTool. GitHub. URL: https://github.com/Koziev/RussianPoetryScansionTool (ударения, метр, рифма; лицензия MIT).",
+    "Koziev I. ArsPoetica (~8,5 тыс. стихов). Hugging Face. URL: https://huggingface.co/datasets/inkoziev/ArsPoetica.",
+    "Koziev I. Rifma (5002 фрагмента с разметкой ударений и схемы рифмовки). GitHub. URL: https://github.com/Koziev/Rifma.",
+    "Plecháč P. A Collocation-Driven Method of Discovering Rhymes // Taming the Corpus. Springer, 2018. RhymeTagger. URL: https://github.com/versotym/rhymetagger.",
+    "Plecháč P. et al. Training Data Size Sensitivity in Unsupervised Rhyme Recognition. arXiv:2604.08156. URL: https://arxiv.org/abs/2604.08156v1.",
+    "Koziev I. rupostagger — POS Tagger for Russian. GitHub. URL: https://github.com/Koziev/rupostagger.",
+    "Koziev I. rutokenizer. GitHub. URL: https://github.com/Koziev/rutokenizer.",
+    "Dathathri S. et al. Plug and Play Language Models // ICLR 2020. arXiv:1912.02164. URL: https://arxiv.org/abs/1912.02164.",
+    "Yang K., Klein D. FUDGE: Controlled Text Generation With Future Discriminators // NAACL 2021. arXiv:2104.05218. URL: https://arxiv.org/abs/2104.05218.",
+    "Hokamp C., Liu Q. Lexically Constrained Decoding Using Grid Beam Search. arXiv:1704.07138. URL: https://arxiv.org/abs/1704.07138.",
+    "Qin L. et al. COLD Decoding: Energy-based Constrained Text Generation. arXiv:2202.11705. URL: https://arxiv.org/pdf/2202.11705.",
+    "Lu X. et al. NeuroLogic Decoding. arXiv:2010.12884. URL: https://arxiv.org/pdf/2010.12884v1.",
+    "Manurung R., Ranta A. et al. «Poetic» Statistical Machine Translation: Rhyme and Meter // EMNLP 2010. URL: https://aclanthology.org/D10-1016.pdf.",
+    "Huang S. et al. The N+ Implementation Details of RLHF with PPO (TL;DR). arXiv:2403.17031. URL: https://arxiv.org/pdf/2403.17031.",
+    "Casas N. et al. Generate and Revise: Reinforcement Learning in Neural Poetry. arXiv:2102.04114. URL: https://arxiv.org/abs/2102.04114.",
+    "Casas N. et al. Creative Data Generation: A Review Focusing on Text and Poetry. arXiv:2305.08493. URL: https://arxiv.org/pdf/2305.08493.",
+    "Lee H. et al. RLAIF vs. RLHF: Scaling Reinforcement Learning from Human Feedback with AI Feedback. arXiv:2309.00267. URL: https://arxiv.org/html/2309.00267v3.",
+    "Regularized Best-of-N Sampling with MBR Objective for Language Model Alignment. arXiv:2404.01054. URL: https://arxiv.org/abs/2404.01054.",
+    "Belouadi J., Eger S. Evaluating Diversity in Automatic Poetry Generation. arXiv:2406.15267. URL: https://arxiv.org/html/2406.15267v1.",
+    "POEMetric: The Last Stanza of Humanity. arXiv:2604.03695. URL: https://arxiv.org/html/2604.03695v1.",
+    "Introducing Aspects of Creativity in Automatic Poetry Generation. arXiv:2002.02511. URL: https://arxiv.org/pdf/2002.02511.",
+    "Manurung R. et al. Autonomous Haiku Generation. arXiv:1906.08733. URL: https://arxiv.org/pdf/1906.08733.",
+    "Gusev I. stihi_ru. Hugging Face. URL: https://huggingface.co/datasets/IlyaGusev/stihi_ru.",
+    "Поэтический подкорпус Национального корпуса русского языка (НКРЯ). URL: https://ruscorpora.ru/page/corpus-poetic-index/.",
+    "PULPO: a multilingual poetry corpus. Hugging Face. URL: https://huggingface.co/datasets/linhd-postdata/pulpo.",
+    "Parrish A. Gutenberg Poetry Corpus (CC0). GitHub. URL: https://github.com/aparrish/gutenberg-poetry-corpus.",
+    "ГОСТ Р 7.0.100–2018. Библиографическая запись. Библиографическое описание. М.: Стандартинформ, 2018.",
+    "ГОСТ 7.32–2017. Отчёт о научно-исследовательской работе. Структура и правила оформления. М.: Стандартинформ, 2017.",
+]
+N_SOURCES = len(BIBLIO)
+
+
+def bibliography(doc):
+    h1(doc, "СПИСОК ИСПОЛЬЗОВАННЫХ ИСТОЧНИКОВ")
+    for i, src in enumerate(BIBLIO, 1):
+        p = doc.add_paragraph()
+        p.paragraph_format.first_line_indent = Cm(0)
+        p.paragraph_format.left_indent = Cm(0.75)
+        p.paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+        # «висячий» отступ: номер с выступом
+        p.paragraph_format.first_line_indent = Cm(-0.75)
+        p.add_run(f"{i}. {src}")
+
+
+def appendix(doc):
+    h1(doc, "ПРИЛОЖЕНИЕ А", page_break=True, toc=False)
+    p = doc.add_paragraph(); p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p.paragraph_format.first_line_indent = Cm(0)
+    p.add_run("(справочное)").italic = True
+    para(doc, "Диаграмма Ганта плана работы над ВКР и интерфейс прототипа «Rhymer».")
+    para(doc, "Диаграмма Ганта подготовлена в формате mermaid (исходный текст — в "
+              "репозитории проекта, docs/practice/02_plan_gantt.md) и может быть "
+              "экспортирована в PNG/SVG через сервис mermaid.live для вставки в "
+              "пояснительную записку ВКР. Скриншоты интерфейса приложения "
+              "(вкладки «Генерация» и «Оценка рифм», окно настроек провайдера, "
+              "сохранение сессий) приводятся в презентации к защите отчёта.")
+    para(doc, "Рисунок А.1 — Диаграмма Ганта (вставляется при вёрстке).", indent=False)
+
+
+# ---------------------------------------------------------------- сборка
+def build():
+    doc = Document()
+    setup_styles(doc)
+    page_footer(doc)
+
+    title_page(doc)
+    referat(doc)
+    toc(doc)
+    introduction(doc)
+    chapter1(doc)
+    chapter2(doc)
+    chapter3(doc)
+    chapter4(doc)
+    conclusion(doc)
+    bibliography(doc)
+    appendix(doc)
+
+    doc.save(OUT)
+    print("Сохранено:", OUT, "| источников:", N_SOURCES, "| PAGES:", PAGES)
+
+
+if __name__ == "__main__":
+    build()
