@@ -138,6 +138,16 @@ def page_footer(doc):
     for run in p.runs:
         run.font.name = FONT; run.font.size = Pt(14)
 
+    # титул: город и год — в колонтитуле первой страницы (выходные данные внизу)
+    ff = sec.first_page_footer
+    ff.is_linked_to_previous = False
+    fp = ff.paragraphs[0]
+    fp.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    fp.paragraph_format.first_line_indent = Cm(0)
+    fp.paragraph_format.space_before = Pt(48)
+    r = fp.add_run("Великий Новгород\n2026")
+    r.font.name = FONT; r.font.size = Pt(14)
+
 
 # ---------------------------------------------------------------- хелперы блоков
 def h1(doc, text, page_break=True, toc=True):
@@ -303,6 +313,10 @@ def title_page(doc):
     line("Политехнический институт")
     line("Кафедра информационных технологий и систем", after=24)
 
+    # пустые строки-разделители: выравнивание заголовка титула по вертикали
+    line("", before=24)
+    line("", before=24)
+    line("", before=24)
     line("ОТЧЁТ", bold=True, size=16, before=24)
     line("по учебной практике", size=14, after=18)
     line("на тему:", size=14)
@@ -310,6 +324,7 @@ def title_page(doc):
     line("рифмованной русской поэзии»", bold=True, size=14, after=12)
     line("по направлению подготовки 09.04.01 «Информатика и вычислительная техника»,")
     line("профиль подготовки «Искусственный интеллект»", after=48)
+    line("", after=48)   # разделитель перед блоком подписей
 
     # блок «руководитель / студент» справа
     for txt in ["Руководитель:", "______________ / ____________________",
@@ -323,10 +338,7 @@ def title_page(doc):
         p.paragraph_format.line_spacing_rule = WD_LINE_SPACING.SINGLE
         p.add_run(txt).font.size = Pt(14)
 
-    p = doc.add_paragraph(); p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    p.paragraph_format.first_line_indent = Cm(0)
-    p.paragraph_format.space_before = Pt(48)
-    p.add_run("Великий Новгород\n2026")
+    # город/год вынесены в колонтитул первой страницы (см. page_footer)
 
 
 def toc(doc):
@@ -672,7 +684,7 @@ def chapter3(doc):
         ["PULPO", "мультияз.", ">72–95 млн слов", "нет", "см. карточку"],
         ["Gutenberg Poetry", "EN", "3,09 млн строк", "нет", "CC0"],
         ["poems/ (проект)", "RU", "50 строф / 359 строк", "нет", "классика (PD)"],
-    ], widths=[4.3, 2.0, 3.2, 4.0, 3.0],
+    ], widths=[3.97, 2.33, 3.69, 3.51, 3.0],
         caption="Наборы данных — кандидаты", num=3)
     para(doc, "Основной выбор: для обучения и валидации детектора рифмы — Rifma и "
               "ArsPoetica; для языкового разнообразия и генерации — stihi_ru (и "
@@ -748,7 +760,7 @@ def chapter4(doc):
         ["meter accuracy", "доля строк с корректным размером", "контроль размера"],
         ["precision/recall групп", "TP/(TP+FP), TP/(TP+FN)", "валидация детектора"],
         ["корреляция с экспертом", "Spearman ρ_s", "согласие с человеком"],
-    ], widths=[4.3, 7.0, 5.2], caption="Метрики качества", num=4)
+    ], widths=[4.3, 7.44, 4.76], caption="Метрики качества", num=4)
     h2(doc, "4.3 Требования к окружению")
     para(doc, "Требования к программному окружению прототипа приведены в "
               "таблице 5.")
