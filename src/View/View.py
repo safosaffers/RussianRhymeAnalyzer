@@ -2,12 +2,14 @@
 import html
 import importlib.util
 import os
+import random
 
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QFormLayout,
     QGroupBox, QLabel, QSpinBox, QDoubleSpinBox, QComboBox, QPushButton,
     QPlainTextEdit, QTextEdit, QTableWidget, QTableWidgetItem, QHeaderView,
     QFrame, QCheckBox, QTabWidget, QFileDialog, QMessageBox, QSizePolicy,
+    QDialog, QDialogButtonBox,
 )
 from PySide6.QtGui import QAction, QPainter, QColor, QPixmap, QIcon
 from PySide6.QtCore import Qt, Signal, QRect
@@ -17,6 +19,17 @@ from Model.Session import save_session, load_session
 
 METERS = ["ямб", "хорей", "дактиль", "амфибрахий", "анапест"]
 SCHEMES = ["ABAB", "AABB", "ABBA"]
+
+# приветствие в строке статуса — выбирается случайно при запуске
+GREETINGS = [
+    "Можете приступать - желаем продуктивной работы!",
+    "Добро пожаловать! Вдохновения и точных рифм.",
+    "Готовы творить? Удачных строк!",
+    "Рифмуйте смело - мы всё посчитаем.",
+    "Пусть слова ложатся в такт. Успехов!",
+    "Здравствуйте! Пусть муза не подведёт.",
+    "За дело! Хорошей рифмы и лёгкого пера.",
+]
 # Юкава — первой, поэтому она выбрана по умолчанию в выпадающем списке.
 _ALL_METHODS = [("Юкава (мой)", "yukawa"), ("RPST (хвосты)", "rpst")]
 # В облегчённой сборке russian_scansion (и torch) не вшиты — оставляем только Юкаву.
@@ -70,6 +83,27 @@ def load_error_bg():
     return _load_pix("bgerror.jpg", "bgerror.png")
 
 
+def load_yukawa_bg():
+    """Портрет Юкавы — фон окна настройки детектора."""
+    return _load_pix("Ukawa.jpeg", "Ukawa.jpg", "ukawa.jpeg", "ukawa.jpg")
+
+
+def _glass_panel_qss(label_alpha=0.88, field_alpha=0.85):
+    """QSS «стеклянной» панели: сама панель прозрачна (виден фон-фигуры),
+    подписи — на тёмной полупрозрачной подложке с белым текстом, поля ввода —
+    чуть прозрачные с тёмным текстом. Общая для диалога Юкавы и вкладки
+    генерации (параметры/кандидаты)."""
+    return (
+        "#panel { background: transparent; border: none; }"
+        "#panel QLabel, #panel QCheckBox {"
+        f" color:#ffffff; background: rgba(15,23,42,{label_alpha});"
+        " border-radius:9px; padding:3px 10px; }"
+        "#panel QSpinBox, #panel QDoubleSpinBox, #panel QComboBox,"
+        " #panel QPlainTextEdit {"
+        f" background: rgba(252,249,242,{field_alpha}); color:#1F2937; }}"
+    )
+
+
 def paint_cover(widget, pix, fallback=QColor("#7C3AED")):
     """Рисует pix на всё окно в режиме «cover» (заполнить, обрезать края)."""
     p = QPainter(widget)
@@ -119,6 +153,45 @@ class ErrorBox(QMessageBox):
             super().paintEvent(e)
 
 
+class YukawaDialog(QDialog):
+    """Настройка детектора Юкавы в отдельном окне (фон — портрет Юкавы).
+    Переиспользует ту же панель параметров, что и вкладка «Оценка рифм»,
+    поэтому yukawa_params() читает те же виджеты, а правки пересчитывают
+    разбор вживую."""
+
+    def __init__(self, parent, panel):
+        super().__init__(parent)
+        self.setWindowTitle("Настройка Юкавы")
+        self.setMinimumWidth(480)
+        # только заголовок и крестик: свернуть/развернуть у диалога не работают
+        self.setWindowFlags(Qt.Dialog | Qt.CustomizeWindowHint
+                            | Qt.WindowTitleHint | Qt.WindowCloseButtonHint)
+        self.setAttribute(Qt.WA_StyledBackground, True)
+        self._bg = load_yukawa_bg()
+        # панель прозрачная (виден портрет); подписи — на тёмной полупрозрачной
+        # подложке с белым текстом (как основные labels), поля цифр чуть прозрачные
+        panel.setStyleSheet(_glass_panel_qss())
+        root = QVBoxLayout(self)
+        root.setContentsMargins(24, 24, 24, 24)
+        cap = QLabel("Параметры детектора рифмы Юкавы. Изменения сразу "
+                     "пересчитывают разбор на вкладке «Оценка рифм».")
+        cap.setWordWrap(True)
+        root.addWidget(cap)
+        root.addWidget(panel)
+        panel.show()
+        bb = QDialogButtonBox(QDialogButtonBox.Close)
+        bb.button(QDialogButtonBox.Close).setText("Закрыть")
+        bb.rejected.connect(self.reject)
+        bb.accepted.connect(self.accept)
+        root.addWidget(bb)
+
+    def paintEvent(self, e):
+        if self._bg is not None:
+            paint_cover(self, self._bg)
+        else:
+            super().paintEvent(e)
+
+
 class CollapsibleSection(QWidget):
     """Окошко с шапкой-кнопкой: клик — свернуть/развернуть содержимое."""
 
@@ -149,9 +222,10 @@ class View(QMainWindow):
 
     candidate_selected = Signal(int)
     tune_changed = Signal()        # изменили константы Юкавы — пересчитать вживую
+    eval_changed = Signal()        # изменился текст/метод — переоценить вживую
     settings_applied = Signal(dict)  # сохранили настройки (провайдер/ключи)
 
-    TITLE = "Каримов Сафо. Rhymer — генерация и оценка рифм"
+    TITLE = "Rhymer - генерация и оценка рифм"
 
     THEMES = ["light", "dark"]
 
@@ -174,6 +248,9 @@ class View(QMainWindow):
         # отмечаем несохранённые правки основного содержимого
         self.pte_input.textChanged.connect(self._mark_dirty)
         self.le_theme.textChanged.connect(self._mark_dirty)
+        # живая оценка: смена текста или метода — переоценить
+        self.pte_input.textChanged.connect(self.eval_changed)
+        self.cb_method.currentIndexChanged.connect(self.eval_changed)
 
     # ---------- построение ----------
     def _build(self):
@@ -183,14 +260,15 @@ class View(QMainWindow):
         root.setContentsMargins(22, 14, 22, 22)
         root.setSpacing(14)
 
-        # верхняя панель: метод рифм (общий), статус, тема оформления
+        # верхняя панель: метод рифм (если их несколько), статус, тема оформления
         top = QHBoxLayout()
-        top.addWidget(QLabel("Метод определения рифм:"))
         self.cb_method = QComboBox()
         self.cb_method.addItems([t for t, _ in METHODS])
-        top.addWidget(self.cb_method)
-        top.addSpacing(16)
-        self.l_status = QLabel("Готово"); self.l_status.setObjectName("status")
+        if len(METHODS) > 1:            # выбирать нечего, когда метод один
+            top.addWidget(QLabel("Метод определения рифм:"))
+            top.addWidget(self.cb_method)
+            top.addSpacing(16)
+        self.l_status = QLabel(random.choice(GREETINGS)); self.l_status.setObjectName("status")
         # статус не должен растягивать окно под длинный текст
         self.l_status.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
         top.addWidget(self.l_status, 1)
@@ -230,9 +308,12 @@ class View(QMainWindow):
         m_view.addAction(self.act_dark)
 
         m_settings = bar.addMenu("Настройки")
-        act = QAction("Параметры…", self)
-        act.triggered.connect(self._open_settings)
-        m_settings.addAction(act)
+        act_api = QAction("API ключ…", self)
+        act_api.triggered.connect(self._open_settings)
+        m_settings.addAction(act_api)
+        act_yk = QAction("Настройка Юкавы…", self)
+        act_yk.triggered.connect(self._open_yukawa)
+        m_settings.addAction(act_yk)
 
     def _open_settings(self):
         dlg = SettingsDialog(self, dark=(self.current_theme == "dark"))
@@ -241,6 +322,14 @@ class View(QMainWindow):
             save_settings(cfg)
             apply_to_env(cfg)
             self.settings_applied.emit(cfg)
+
+    def _open_yukawa(self):
+        # панель Юкавы переиспользуется: на время диалога переносим её в него,
+        # после закрытия возвращаем во View (иначе удалится вместе с диалогом).
+        dlg = YukawaDialog(self, self._yk_panel)
+        dlg.exec()
+        self._yk_panel.setParent(self)
+        self._yk_panel.hide()
 
     # ---------- сессия (Файл) ----------
     def session_state(self) -> dict:
@@ -358,7 +447,7 @@ class View(QMainWindow):
         # --- слева: параметры (свор.), кнопка, кандидаты (свор.) ---
         left = QVBoxLayout()
         params = QWidget(); params.setObjectName("panel"); form = QFormLayout(params)
-        self.le_theme = GrowingTextEdit(min_lines=1, max_lines=6)
+        self.le_theme = GrowingTextEdit(min_lines=3, max_lines=6)
         self.le_theme.setPlaceholderText("тема стихотворения: зима, любовь, море…")
         self.sb_lines = QSpinBox(); self.sb_lines.setRange(2, 12); self.sb_lines.setValue(4)
         self.cb_meter = QComboBox(); self.cb_meter.addItems(METERS)
@@ -371,6 +460,7 @@ class View(QMainWindow):
         form.addRow("Кандидатов (N):", self.sb_n)
         self.cb_llm = QCheckBox("Генерировать через ИИ")
         form.addRow(self.cb_llm)
+        params.setStyleSheet(_glass_panel_qss())   # «стеклянная» панель — виден фон
         self.sec_params = CollapsibleSection("Параметры генерации", params)
         left.addWidget(self.sec_params)
 
@@ -384,8 +474,11 @@ class View(QMainWindow):
         self.tbl.setEditTriggers(QTableWidget.NoEditTriggers)
         self.tbl.setSelectionBehavior(QTableWidget.SelectRows)
         self.tbl.cellClicked.connect(lambda r, c: self.candidate_selected.emit(r))
+        # «стеклянная» таблица кандидатов — фон-фигуры чуть просвечивают
+        self.tbl.setStyleSheet(
+            "QTableWidget { background: rgba(252,249,242,0.85); color:#1F2937; }")
         self.sec_candidates = CollapsibleSection(
-            "Кандидаты (по убыванию качества рифмы)", self.tbl)
+            "Кандидаты (по убыванию качества рифмы)", self.tbl, expanded=False)
         left.addWidget(self.sec_candidates, 1)
 
         # --- справа: крупное поле «лучший вариант» ---
@@ -411,6 +504,11 @@ class View(QMainWindow):
         self.sec_candidates.header.toggled.connect(self._update_gen_split)
         return tab
 
+    def show_generated_layout(self):
+        """После генерации: свернуть параметры, развернуть кандидатов."""
+        self.sec_params.header.setChecked(False)
+        self.sec_candidates.header.setChecked(True)
+
     def _update_gen_split(self):
         both = (not self.sec_params.content.isVisible()
                 and not self.sec_candidates.content.isVisible())
@@ -421,14 +519,16 @@ class View(QMainWindow):
         tab = QWidget(); tab.setObjectName("page"); row = QHBoxLayout(tab)
 
         left = QVBoxLayout()
-        left.addWidget(QLabel("Вставьте стихотворение:"))
+        left.addWidget(QLabel("Вставьте стихотворение (оценка — вживую):"))
         self.pte_input = QPlainTextEdit()
         self.pte_input.setPlaceholderText("одна строка стиха на строку…")
         left.addWidget(self.pte_input, 1)
-        left.addWidget(CollapsibleSection(
-            "Настройка Юкавы — пересчёт вживую", self._build_yukawa_panel()))
-        self.btn_evaluate = QPushButton("Оценить рифмы")
-        left.addWidget(self.btn_evaluate)
+        # панель Юкавы больше не на вкладке — она в меню «Настройки → Настройка
+        # Юкавы»; строим её здесь и держим во View (скрытой), чтобы поля жили и
+        # yukawa_params() их читал.
+        self._yk_panel = self._build_yukawa_panel()
+        self._yk_panel.setParent(self)
+        self._yk_panel.hide()
 
         right = QVBoxLayout()
         right.addWidget(QLabel("Разбор (рифмы выделены цветом):"))
@@ -460,7 +560,7 @@ class View(QMainWindow):
         self.yk_link = self._dspin(0.0, 1.0, 0.05, 0.6)
         self.yk_vowel = self._dspin(0.0, 1.0, 0.05, 0.6)
         self.yk_use_energy = QCheckBox("Учитывать энергию слогов")
-        self.yk_use_energy.setChecked(True)
+        self.yk_use_energy.setChecked(False)   # по умолчанию выкл: занижает валидные рифмы
         self.yk_use_energy.stateChanged.connect(lambda *_: self.tune_changed.emit())
         self.yk_ediv = self._dspin(1.0, 50.0, 1.0, 10.0, decimals=1)
         self.yk_voiced = self._dspin(0.5, 4.0, 0.1, 2.0)
@@ -496,14 +596,14 @@ class View(QMainWindow):
         defaults = {self.yk_lam: 0.8, self.yk_gamma: 0.3, self.yk_link: 0.6,
                     self.yk_vowel: 0.6, self.yk_ediv: 10.0,
                     self.yk_voiced: 2.0, self.yk_voiceless: 0.5}
-        checks = [self.yk_use_distance, self.yk_use_energy]
-        for w in list(defaults) + checks:
+        checks = {self.yk_use_distance: True, self.yk_use_energy: False}
+        for w in list(defaults) + list(checks):
             w.blockSignals(True)
         for w, v in defaults.items():
             w.setValue(v)
-        for c in checks:
-            c.setChecked(True)
-        for w in list(defaults) + checks:
+        for c, on in checks.items():
+            c.setChecked(on)
+        for w in list(defaults) + list(checks):
             w.blockSignals(False)
         self.tune_changed.emit()
 
@@ -541,7 +641,6 @@ class View(QMainWindow):
 
     def set_busy(self, busy: bool):
         self.btn_generate.setEnabled(not busy)
-        self.btn_evaluate.setEnabled(not busy)
         self.btn_improve.setEnabled(not busy and self._llm_ok)
 
     # ---------- результаты ----------
@@ -556,6 +655,11 @@ class View(QMainWindow):
         self.l_eval_metrics.setText(self._fmt_metrics(m))
         leg = self._legend_html(m)
         self.l_eval_legend.setText(leg); self.l_eval_legend.setVisible(bool(leg))
+
+    def clear_eval(self):
+        self.te_eval_best.clear()
+        self.l_eval_metrics.setText("—")
+        self.l_eval_legend.clear(); self.l_eval_legend.setVisible(False)
 
     def show_error(self, msg: str):
         """Ошибку показываем отдельным окном «Ой-ой....» с фоном bgerror.jpg."""
@@ -652,6 +756,10 @@ class View(QMainWindow):
     def _app_qss(dark: bool) -> str:
         # фон рисует DecorBackground; здесь — панели/блоки/кнопки.
         NAVY, YELLOW = "#1E293B", "#FBBF24"
+        _a = os.path.join(os.path.dirname(__file__), "assets")
+        check = os.path.join(_a, "check.png").replace("\\", "/")
+        up = os.path.join(_a, "arrow_up.png").replace("\\", "/")
+        down = os.path.join(_a, "arrow_down.png").replace("\\", "/")
         if dark:
             PANEL, PANEL_FG = "#23252b", "#E5E7EB"
             # поля ввода/вывода — заметно темнее панели, чтобы отличались
@@ -679,7 +787,12 @@ class View(QMainWindow):
             QLabel#status {{ color:{YELLOW}; font-weight:bold; font-size:16px;
                              background: rgba(15,23,42,0.85); }}
             QCheckBox {{ color:#ffffff; font-size:15px; spacing:8px; }}
-            QCheckBox::indicator {{ width:22px; height:22px; }}
+            /* белый квадрат с рамкой; при выборе — белый фон и чёрная галочка */
+            QCheckBox::indicator {{ width:22px; height:22px; border-radius:6px;
+                                    border:2px solid {BORDER}; background:#ffffff; }}
+            QCheckBox::indicator:checked {{ background:#ffffff; border-color:{BTN};
+                                            image: url("{check}"); }}
+            QCheckBox::indicator:hover {{ border-color:{BTN}; }}
 
             /* панель-карточка сворачиваемого окошка */
             QWidget#panel {{ background:{PANEL}; border:3px solid {BORDER};
@@ -699,7 +812,27 @@ class View(QMainWindow):
                 border-radius:12px; padding:8px; font-size:15px;
                 selection-background-color:#7C3AED; }}
             QTextEdit, QPlainTextEdit {{ font-size:17px; }}
-            QComboBox::drop-down {{ border:none; width:26px; }}
+            QComboBox::drop-down {{ subcontrol-origin:border; subcontrol-position:center right;
+                width:30px; border-left:2px solid {BORDER}; background:{NAVY};
+                border-top-right-radius:10px; border-bottom-right-radius:10px; }}
+            QComboBox::drop-down:hover {{ background:{BTN}; }}
+            QComboBox::down-arrow {{ image:url("{down}"); width:14px; height:14px; }}
+            /* аккуратные кнопки счётчика: тёмный фон, белые шевроны, акцент по наведению */
+            QSpinBox::up-button, QDoubleSpinBox::up-button {{
+                subcontrol-origin:border; subcontrol-position:top right; width:26px;
+                border-left:2px solid {BORDER}; border-top-right-radius:10px;
+                background:{NAVY}; }}
+            QSpinBox::down-button, QDoubleSpinBox::down-button {{
+                subcontrol-origin:border; subcontrol-position:bottom right; width:26px;
+                border-left:2px solid {BORDER}; border-bottom-right-radius:10px;
+                background:{NAVY}; }}
+            QSpinBox::up-button:hover, QDoubleSpinBox::up-button:hover,
+            QSpinBox::down-button:hover, QDoubleSpinBox::down-button:hover {{
+                background:{BTN}; }}
+            QSpinBox::up-arrow, QDoubleSpinBox::up-arrow {{
+                image:url("{up}"); width:14px; height:14px; }}
+            QSpinBox::down-arrow, QDoubleSpinBox::down-arrow {{
+                image:url("{down}"); width:14px; height:14px; }}
             /* выпадающий список (выбор метода и т.п.) — свой фон, не сливается с фото */
             QComboBox QAbstractItemView {{ background:{INPUT_BG}; color:{INPUT_FG};
                 border:2px solid {BORDER}; selection-background-color:{BTN};
