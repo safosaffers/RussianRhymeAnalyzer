@@ -24,7 +24,7 @@
   body{
     margin:0; color:var(--ink);
     font:16px/1.6 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
-    background:#101828 url("assets/onepage.png") center top / cover no-repeat;
+    background:#101828 url("assets/onepage.svg") center top / cover no-repeat;
   }
   a{color:var(--pink)}
 
@@ -62,10 +62,13 @@
     transition:filter .12s ease, transform .06s ease;
   }
   .btn:hover{filter:brightness(1.06)} .btn:active{transform:translateY(1px)}
-  .btn .ico{width:22px; height:22px; display:block}
-  .dl{display:flex; gap:14px; flex-wrap:wrap}
-  .install{margin-top:18px; padding-top:16px; border-top:1px solid var(--line); font-size:15px}
-  .install code{
+  /* раздельные блоки скачивания: большая иконка ОС слева, кнопка отдельно */
+  .dl-block{display:flex; align-items:center; gap:22px; flex-wrap:wrap}
+  .os-ico{width:84px; height:84px; flex-shrink:0}
+  .dl-body{flex:1; min-width:min(100%,260px)}
+  .dl-body h2{margin-bottom:6px}
+  .dl-body .btn{margin-top:14px}
+  code{
     font-family:ui-monospace,Menlo,Consolas,monospace;
     background:rgba(100,116,139,.16); border-radius:6px; padding:2px 6px; font-size:.92em;
   }
@@ -102,22 +105,34 @@
     <img src="assets/icon.png" alt="Логотип Rhymer">
     <span class="name">Rhymer</span>
   </div>
-  <span class="contact">telegram: <a href="https://t.me/zackarym">@zackarym</a></span>
+  <span class="contact">Вопросы, предложения? Пиши в telegram: <a href="https://t.me/zackarym">@zackarym</a></span>
 </header>
 
 <main>
 
-  <!-- Скачивание + инструкция сразу под кнопкой -->
+  <!-- Заголовок -->
   <section class="block">
     <h1>Генерация стихов и оценка рифмы</h1>
     <p class="muted">Десктоп-приложение для русской поэзии: пишет стихи и само оценивает качество рифмы алгоритмом "Юкава".</p>
-    <div class="dl">
-      <a class="btn" href="downloads/Rhymer-linux-x86_64.zip" download><img class="ico" src="assets/linux_penguin.ico" alt="">Скачать для Linux</a>
-      <button class="btn" type="button"><img class="ico" src="assets/windows.ico" alt="">Скачать для Windows</button>
+  </section>
+
+  <!-- Скачать: Windows -->
+  <section class="block dl-block">
+    <img class="os-ico" src="assets/windows.ico" alt="Windows">
+    <div class="dl-body">
+      <h2>Windows x64</h2>
+      <p>Распакуйте архив и запустите <code>Rhymer.exe</code>. Размер ~75 МБ.</p>
+      <a class="btn" href="downloads/Rhymer-windows-x86_64.zip" download>Скачать для Windows</a>
     </div>
-    <div class="install">
-      <p><b>Linux</b> (x86_64, ~143 МБ): распакуйте архив и запустите <code>./Rhymer/Rhymer</code>. Требования: x86_64, glibc (Ubuntu 20.04+).</p>
-      <p><b>Windows</b>: распакуйте архив и запустите <code>Rhymer.exe</code></p>
+  </section>
+
+  <!-- Скачать: Linux -->
+  <section class="block dl-block">
+    <img class="os-ico" src="assets/linux_penguin.ico" alt="Linux">
+    <div class="dl-body">
+      <h2>Linux x86_64</h2>
+      <p>Распакуйте архив и запустите <code>./Rhymer/Rhymer</code>. Размер ~155 МБ; требования: x86_64, glibc (Ubuntu 20.04+).</p>
+      <a class="btn" href="downloads/Rhymer-linux-x86_64.zip" download>Скачать для Linux</a>
     </div>
   </section>
 
