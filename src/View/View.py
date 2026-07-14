@@ -9,7 +9,7 @@ from PySide6.QtWidgets import (
     QPlainTextEdit, QTextEdit, QTableWidget, QTableWidgetItem, QHeaderView,
     QFrame, QCheckBox, QTabWidget, QFileDialog, QMessageBox, QSizePolicy,
 )
-from PySide6.QtGui import QAction, QPainter, QColor, QPixmap
+from PySide6.QtGui import QAction, QPainter, QColor, QPixmap, QIcon
 from PySide6.QtCore import Qt, Signal, QRect
 
 from View.SettingsDialog import SettingsDialog, save_settings, apply_to_env
@@ -162,6 +162,9 @@ class View(QMainWindow):
         self._dirty = False
         self._llm_ok = False
         self.setWindowTitle(self.TITLE)
+        icon = _load_pix("icon.png")
+        if icon is not None:
+            self.setWindowIcon(QIcon(icon))
         self.resize(1200, 780)
         self._build()
         self.apply_theme()
