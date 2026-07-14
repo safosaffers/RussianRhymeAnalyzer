@@ -43,10 +43,14 @@ def manhattan_distance(p1, p2):
 
 
 def yukawa_kernel(d, lam=0.8):
-    """Экранированное взаимодействие: подавляет дальние связи."""
+    """Экранированное взаимодействие: подавляет дальние связи.
+
+    Сдвиг d-1 нормирует ядро так, что ближайшая пара (d=1) не штрафуется
+    вовсе (K=1), а деление на d убрано: иначе рифма через строку (ABAB,
+    d=2) подавлялась в ~4 раза сильнее соседней (AABB) и не проходила порог."""
     if d == 0:
         return 1.0
-    return np.exp(-lam * d) / d
+    return np.exp(-lam * (d - 1))
 
 
 def apply_resonance(S, gamma=0.3):
@@ -76,11 +80,11 @@ class YukawaDetector:
 
     DEFAULTS = {
         "use_distance": True,   # учитывать экранирование по расстоянию
-        "lam": 0.8,             # λ — сила экранирования (больше → дальние связи слабее)
+        "lam": 0.3,             # λ — сила экранирования (0.8 душило ABAB: рифму через строку)
         "gamma": 0.3,           # γ — вес резонанса (общие «друзья»)
-        "link_ratio": 0.6,      # порог рифмы как доля от максимума связи
+        "link_ratio": 0.65,     # АБСОЛЮТНЫЙ порог силы связи (>0.6 режет "только гласная")
         "vowel_weight": 0.6,    # вес совпадения гласной в схожести (согласные = 1−вес)
-        "use_energy": True,     # домножать связь на энергии слогов
+        "use_energy": False,    # энергия слогов выкл: лёгкие слоги ("я") занижались
         "energy_div": 10.0,     # делитель произведения энергий
         "voiced_mult": 2.0,     # множитель энергии для звонких согласных
         "voiceless_mult": 0.5,  # множитель энергии для глухих согласных
@@ -98,6 +102,7 @@ class YukawaDetector:
         for i, line in enumerate(lines):
             items = []
             col = 0
+            start = len(nodes)
             for wi, word in enumerate(line.split()):
                 if wi > 0:
                     items.append(("space", None))
@@ -105,6 +110,12 @@ class YukawaDetector:
                     items.append(("syl", len(nodes)))
                     nodes.append((i, col, syl))
                     col += 1
+            # колонку считаем от КОНЦА строки: окончания всех строк выравниваются
+            # (col=0), и рифма через строку (ABAB) не штрафуется разницей длин
+            # строк; внутристрочные расстояния |Δcol| при этом не меняются
+            for k in range(start, len(nodes)):
+                li, c, s = nodes[k]
+                nodes[k] = (li, col - 1 - c, s)
             line_render.append(items)
 
         N = len(nodes)
@@ -160,7 +171,10 @@ class YukawaDetector:
         off = S.copy()
         np.fill_diagonal(off, 0.0)
         peak = off.max()
-        thr = p["link_ratio"] * peak
+        # порог АБСОЛЮТНЫЙ: sim и ядро уже в [0, 1], поэтому link_ratio — это
+        # минимальная сила связи. Порог "доля от пика" в стихе без идеальной
+        # пары проседал и заливал текст шумом, а при пике 1.0 душил ABAB
+        thr = p["link_ratio"]
         parent = list(range(N))
 
         def find(x):
