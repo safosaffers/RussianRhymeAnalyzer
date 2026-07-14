@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rhymer - генерация стихов и оценка рифмы</title>
+<meta name="description" content="Rhymer - десктоп-приложение для русской поэзии: генерация стихов и автоматическая оценка рифмы алгоритмом Юкава.">
+<link rel="icon" href="assets/icon-256.png">
+<style>
+  :root{
+    --pink:#EC4899; --yellow:#FBBF24;
+    --ink:#1E293B; --muted:#5A6678;
+    --panel:rgba(251,247,239,.93); --line:rgba(30,41,59,.10);
+    --btn:#EC4899; --btn-ink:#fff;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --ink:#E8EDF5; --muted:#9FB0C6;
+      --panel:rgba(20,29,46,.90); --line:rgba(255,255,255,.10);
+      --btn:#E11D48; --btn-ink:#fff;
+    }
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; color:var(--ink);
+    font:16px/1.6 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+    background:#101828 url("assets/onepage.png") center top / cover no-repeat;
+  }
+  a{color:var(--pink)}
+
+  /* шапка: логотип + название слева */
+  header{
+    position:sticky; top:0; z-index:20;
+    display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;
+    padding:18px 30px; backdrop-filter:blur(8px);
+    background:var(--panel); border-bottom:1px solid var(--line);
+  }
+  .brand{display:flex; align-items:center; gap:18px}
+  header img{width:54px; height:54px; border-radius:13px}
+  .name{font-size:30px; font-weight:800; letter-spacing:-.3px}
+  .contact{font-size:16px; font-weight:600}
+
+  main{max-width:840px; margin:0 auto; padding:28px 20px 48px}
+
+  /* блоки на полупрозрачном фоне */
+  .block{
+    background:var(--panel); border:1px solid var(--line);
+    border-radius:18px; padding:clamp(22px,4vw,34px);
+    margin-bottom:22px; backdrop-filter:blur(8px);
+  }
+  h1{font-size:clamp(26px,5vw,36px); margin:0 0 8px; letter-spacing:-.5px}
+  h2{font-size:clamp(20px,4vw,26px); margin:0 0 14px}
+  p{margin:0 0 12px}
+  .muted{color:var(--muted)}
+
+  /* кнопка скачивания - одноцветная, яркая, крупная */
+  .btn{
+    display:inline-flex; align-items:center; gap:10px; text-decoration:none;
+    background:var(--btn); color:var(--btn-ink); font-weight:700; font-size:19px;
+    border:none; border-radius:13px; padding:17px 32px; cursor:pointer;
+    box-shadow:0 8px 20px rgba(236,72,153,.32);
+    transition:filter .12s ease, transform .06s ease;
+  }
+  .btn:hover{filter:brightness(1.06)} .btn:active{transform:translateY(1px)}
+  .btn .ico{width:22px; height:22px; display:block}
+  .dl{display:flex; gap:14px; flex-wrap:wrap}
+  .install{margin-top:18px; padding-top:16px; border-top:1px solid var(--line); font-size:15px}
+  .install code{
+    font-family:ui-monospace,Menlo,Consolas,monospace;
+    background:rgba(100,116,139,.16); border-radius:6px; padding:2px 6px; font-size:.92em;
+  }
+
+  /* что умеет */
+  ul.feat{margin:0; padding-left:20px}
+  ul.feat li{margin:8px 0}
+  .flow{
+    margin-top:16px; padding:12px 16px; border-radius:12px;
+    background:rgba(236,72,153,.10); font-weight:600; font-size:15px;
+  }
+  .flow b{color:var(--pink)}
+
+  /* 2 больших скриншота, по одному в ряд */
+  figure{margin:0 0 22px}
+  figure:last-child{margin-bottom:0}
+  figure img{
+    width:100%; height:auto; display:block; border-radius:12px;
+    border:1px solid var(--line); cursor:zoom-in;
+  }
+  figcaption{font-size:14px; color:var(--muted); margin-top:8px}
+
+  /* лайтбокс */
+  .lb{position:fixed; inset:0; background:rgba(10,15,25,.92); display:none;
+      align-items:center; justify-content:center; padding:20px; z-index:50; cursor:zoom-out}
+  .lb.open{display:flex}
+  .lb img{max-width:100%; max-height:100%; border-radius:10px}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <img src="assets/icon.png" alt="Логотип Rhymer">
+    <span class="name">Rhymer</span>
+  </div>
+  <span class="contact">telegram: <a href="https://t.me/zackarym">@zackarym</a></span>
+</header>
+
+<main>
+
+  <!-- Скачивание + инструкция сразу под кнопкой -->
+  <section class="block">
+    <h1>Генерация стихов и оценка рифмы</h1>
+    <p class="muted">Десктоп-приложение для русской поэзии: пишет стихи и само оценивает качество рифмы алгоритмом "Юкава".</p>
+    <div class="dl">
+      <a class="btn" href="downloads/Rhymer-linux-x86_64.zip" download><img class="ico" src="assets/linux_penguin.ico" alt="">Скачать для Linux</a>
+      <button class="btn" type="button"><img class="ico" src="assets/windows.ico" alt="">Скачать для Windows</button>
+    </div>
+    <div class="install">
+      <p><b>Linux</b> (x86_64, ~143 МБ): распакуйте архив и запустите <code>./Rhymer/Rhymer</code>. Требования: x86_64, glibc (Ubuntu 20.04+).</p>
+      <p><b>Windows</b>: распакуйте архив и запустите <code>Rhymer.exe</code></p>
+    </div>
+  </section>
+
+  <!-- Что умеет + пайплайн одной строкой -->
+  <section class="block">
+    <h2>Что умеет</h2>
+    <ul class="feat">
+      <li>Генерирует стихи по теме, размеру и схеме рифмовки (best-of-N через ИИ).</li>
+      <li>Оценивает рифму своим алгоритмом "Юкава": граф слогов, процент зарифмованных слогов, группы рифм.</li>
+      <li>Улучшает стих: подсвечивает слабые окончания и переписывает плохие рифмы через ИИ.</li>
+    </ul>
+    <p class="muted">Ключ ИИ вводится в разделе "Настройки"; без ключа работает офлайн-режим - оценка рифмы считается локально.</p>
+    <div class="flow">ИИ генерирует <b>-&gt;</b> Юкава оценивает <b>-&gt;</b> ИИ переписывает слабые рифмы</div>
+  </section>
+
+  <!-- 2 больших скриншота -->
+  <section class="block">
+    <h2>Как выглядит</h2>
+    <figure>
+      <img src="assets/example_1_generation.png" alt="Генерация стихов">
+      <figcaption>Генерация стихов: тема, размер, схема рифмовки - и оценка рифмы лучшего варианта.</figcaption>
+    </figure>
+    <figure>
+      <img src="assets/example_2_rhyme_detection.png" alt="Определение и оценка рифмы">
+      <figcaption>Определение рифмы: подсветка окончаний, процент зарифмованных слогов, группы рифм.</figcaption>
+    </figure>
+  </section>
+
+</main>
+
+<div class="lb" id="lb"><img id="lb-img" src="" alt=""></div>
+<script>
+(function(){
+  var lb=document.getElementById("lb"), im=document.getElementById("lb-img");
+  document.querySelectorAll("figure img").forEach(function(g){
+    g.addEventListener("click",function(){im.src=g.src; im.alt=g.alt; lb.classList.add("open");});
+  });
+  lb.addEventListener("click",function(){lb.classList.remove("open"); im.src="";});
+  document.addEventListener("keydown",function(e){if(e.key==="Escape"){lb.classList.remove("open"); im.src="";}});
+})();
+</script>
+</body>
+</html>

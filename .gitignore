@@ -7,3 +7,4 @@ analogs/
 bkps/
 /build/
 /dist/
+site/downloads/*.zip
