@@ -8,3 +8,4 @@ bkps/
 /build/
 /dist/
 site/downloads/*.zip
+third_party/
