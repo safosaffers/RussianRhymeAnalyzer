@@ -101,10 +101,13 @@ class Presenter(QObject):
 
     # ---------- генерация ----------
     def on_generate(self):
+        use_llm = self.v.use_llm()
+        if use_llm and not self.m.llm_available:   # галочка есть, ключа нет
+            self.v.show_llm_help()
+            return
         p = GenParams(theme=self.v.theme_text(), n_lines=self.v.n_lines(),
                       meter=self.v.meter(), scheme=self.v.scheme())
         n = self.v.n_candidates()
-        use_llm = self.v.use_llm()
         method = self.v.rhyme_method()
         self._mode = "gen"
         src = self.m.llm_name if use_llm else "корпус классики"
@@ -131,7 +134,7 @@ class Presenter(QObject):
     # ---------- улучшение выбранного варианта через ИИ ----------
     def on_improve(self):
         if not self.m.llm_available:
-            self.v.show_error("ИИ недоступен. Задай провайдера и ключ в «Настройки».")
+            self.v.show_llm_help()
             return
         if not self._current_gen:
             self.v.set_status("Сначала сгенерируй и выбери вариант")

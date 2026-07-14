@@ -30,6 +30,18 @@ GREETINGS = [
     "Здравствуйте! Пусть муза не подведёт.",
     "За дело! Хорошей рифмы и лёгкого пера.",
 ]
+
+# подсказка, когда включена генерация через ИИ, но API-ключ не задан
+API_KEY_HELP = (
+    "Для генерации через ИИ нужен API-ключ.<br><br>"
+    "Добавьте его: <b>Настройки -> API ключ</b>.<br><br>"
+    "Например, Gemini (бесплатно):<br>"
+    "1. Откройте <a style=\"color:#FBBF24\" "
+    "href=\"https://aistudio.google.com/api-keys\">"
+    "aistudio.google.com/api-keys</a>;<br>"
+    "2. Create API key -> скопируйте;<br>"
+    "3. Вставьте в поле «Ключ gemini» и выберите провайдера gemini."
+)
 # Юкава — первой, поэтому она выбрана по умолчанию в выпадающем списке.
 _ALL_METHODS = [("Юкава (мой)", "yukawa"), ("RPST (хвосты)", "rpst")]
 # В облегчённой сборке russian_scansion (и torch) не вшиты — оставляем только Юкаву.
@@ -138,10 +150,12 @@ class DecorBackground(QWidget):
 class ErrorBox(QMessageBox):
     """Окно ошибки: заголовок «Ой-ой....» и свой фон (bgerror.jpg)."""
 
-    def __init__(self, parent, text):
+    def __init__(self, parent, text, rich=False):
         super().__init__(parent)
         self.setWindowTitle("Ой-ой....")
         self.setIcon(QMessageBox.Critical)
+        if rich:                       # HTML с кликабельной ссылкой (инструкции)
+            self.setTextFormat(Qt.RichText)
         self.setText(text)
         self.setAttribute(Qt.WA_StyledBackground, True)
         self._bg = load_error_bg()
@@ -555,9 +569,9 @@ class View(QMainWindow):
         self.yk_use_distance = QCheckBox("Экранирование по расстоянию")
         self.yk_use_distance.setChecked(True)
         self.yk_use_distance.stateChanged.connect(lambda *_: self.tune_changed.emit())
-        self.yk_lam = self._dspin(0.0, 3.0, 0.1, 0.8)
+        self.yk_lam = self._dspin(0.0, 3.0, 0.1, 0.3)
         self.yk_gamma = self._dspin(0.0, 1.0, 0.05, 0.3)
-        self.yk_link = self._dspin(0.0, 1.0, 0.05, 0.6)
+        self.yk_link = self._dspin(0.0, 1.0, 0.05, 0.65)
         self.yk_vowel = self._dspin(0.0, 1.0, 0.05, 0.6)
         self.yk_use_energy = QCheckBox("Учитывать энергию слогов")
         self.yk_use_energy.setChecked(False)   # по умолчанию выкл: занижает валидные рифмы
@@ -593,7 +607,7 @@ class View(QMainWindow):
         }
 
     def _reset_yukawa(self):
-        defaults = {self.yk_lam: 0.8, self.yk_gamma: 0.3, self.yk_link: 0.6,
+        defaults = {self.yk_lam: 0.3, self.yk_gamma: 0.3, self.yk_link: 0.65,
                     self.yk_vowel: 0.6, self.yk_ediv: 10.0,
                     self.yk_voiced: 2.0, self.yk_voiceless: 0.5}
         checks = {self.yk_use_distance: True, self.yk_use_energy: False}
@@ -618,19 +632,13 @@ class View(QMainWindow):
     def eval_text(self): return self.pte_input.toPlainText()
 
     def set_llm_available(self, available: bool, name: str = "", provider: str = "anthropic"):
-        hint = {"gemini": ("GEMINI_API_KEY", "openai"),
-                "deepseek": ("DEEPSEEK_API_KEY", "openai"),
-                "anthropic": ("ANTHROPIC_API_KEY", "anthropic")}
-        if available and name:
-            self.cb_llm.setText(f"Генерировать через {name}")
-            self.cb_llm.setToolTip("")
-        else:
-            env, pkg = hint.get(provider, hint["anthropic"])
-            self.cb_llm.setText(f"Генерировать через ИИ (провайдер: {provider})")
-            self.cb_llm.setToolTip(
-                f"Недоступно. Нужно в этой же сессии: RHYMER_PROVIDER={provider}, "
-                f"переменная {env} и пакет {pkg} (pip install {pkg}).")
-        self.cb_llm.setEnabled(available)
+        # надпись всегда нейтральная (провайдер может быть любой); чекбокс
+        # кликабелен и без ключа — при попытке генерации покажем, где взять ключ
+        self.cb_llm.setText("Генерировать через ИИ")
+        self.cb_llm.setToolTip(
+            f"Модель: {name}" if available and name
+            else "API-ключ не задан: Настройки -> API ключ")
+        self.cb_llm.setEnabled(True)
         self.cb_llm.setChecked(available)
         self._llm_ok = available
         self.btn_improve.setEnabled(available)
@@ -664,6 +672,10 @@ class View(QMainWindow):
     def show_error(self, msg: str):
         """Ошибку показываем отдельным окном «Ой-ой....» с фоном bgerror.jpg."""
         ErrorBox(self, msg).exec()
+
+    def show_llm_help(self):
+        """Выбрана генерация через ИИ, а ключа нет — подсказать, где его взять."""
+        ErrorBox(self, API_KEY_HELP, rich=True).exec()
 
     def clear_candidates(self):
         self.tbl.setRowCount(0)
