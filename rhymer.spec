@@ -48,6 +48,7 @@ exe = EXE(
     console=False,            # GUI-приложение без консольного окна
     disable_windowed_traceback=False,
     target_arch=None,
+    icon="src/View/assets/icon_R.ico",   # иконка .exe (Windows); на Linux игнор
 )
 coll = COLLECT(
     exe,

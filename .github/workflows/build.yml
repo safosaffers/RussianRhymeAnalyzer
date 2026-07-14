@@ -50,6 +50,16 @@ jobs:
           QT_QPA_PLATFORM=offscreen ./dist/Rhymer/Rhymer &
           sleep 8 && kill %1 || true
 
+      - name: Smoke test (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath "dist\Rhymer\Rhymer.exe" -PassThru
+          Start-Sleep -Seconds 8
+          if ($p.HasExited) { Write-Error "Rhymer.exe завершился рано (код $($p.ExitCode))"; exit 1 }
+          Stop-Process -Id $p.Id -Force
+          Write-Host "Windows smoke OK"
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
