@@ -119,6 +119,13 @@ class Presenter(QObject):
             return
         reqs = self.v.techniques()
         need = required_lines(reqs)
+        if need and need > self.v.max_n_lines():
+            # молча обрезать нельзя: спинбокс упрётся в предел, и техника
+            # окажется невыполнимой ещё до обращения к модели
+            self.v.show_error(
+                f"Слово требует {need} строк, а предел — {self.v.max_n_lines()}. "
+                "Возьми слово короче или сними требование.")
+            return
         if need and need != self.v.n_lines():
             self.v.set_n_lines(need)      # акростих и родня задают длину жёстко
         p = GenParams(theme=self.v.theme_text(), n_lines=self.v.n_lines(),

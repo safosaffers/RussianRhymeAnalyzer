@@ -652,6 +652,9 @@ class View(QMainWindow):
     def use_deep(self): return self.cb_deep.isChecked()
     def techniques(self): return list(self._techniques)
 
+    def max_n_lines(self) -> int:
+        return self.sb_lines.maximum()
+
     def set_n_lines(self, n: int):
         """Длину диктует техника (акростих): показываем её пользователю."""
         self.sb_lines.setValue(int(n))
