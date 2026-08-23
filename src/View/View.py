@@ -471,7 +471,7 @@ class View(QMainWindow):
         params = QWidget(); params.setObjectName("panel"); form = QFormLayout(params)
         self.le_theme = GrowingTextEdit(min_lines=3, max_lines=6)
         self.le_theme.setPlaceholderText("тема стихотворения: зима, любовь, море…")
-        self.sb_lines = QSpinBox(); self.sb_lines.setRange(2, 20); self.sb_lines.setValue(4)
+        self.sb_lines = QSpinBox(); self.sb_lines.setRange(2, 24); self.sb_lines.setValue(4)
         self.cb_meter = QComboBox(); self.cb_meter.addItems(METERS)
         self.cb_scheme = QComboBox(); self.cb_scheme.addItems(SCHEMES)
         self.sb_n = QSpinBox(); self.sb_n.setRange(2, 16); self.sb_n.setValue(6)
