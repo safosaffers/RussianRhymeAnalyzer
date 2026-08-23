@@ -43,8 +43,10 @@ class LLMGenerator(Generator):
     # Цепочка вызовов на один стих длинная, поэтому ограничиваем ожидание:
     # у SDK по умолчанию 10 минут на запрос и 2 повтора, то есть до получаса
     # молчания на одном шаге.
-    TIMEOUT_S = 120.0
+    TIMEOUT_S = 120.0       # база; на длинный ответ ждём дольше, см. _ask
     MAX_RETRIES = 2
+    TOKENS_PER_S = 40.0     # осторожная оценка скорости письма модели
+    TIMEOUT_MAX_S = 600.0
 
     def _ensure(self):
         if self._client is None:
@@ -70,7 +72,12 @@ class LLMGenerator(Generator):
     def _ask(self, user: str, schema: dict, max_tokens: int = 4000,
              system: list = None) -> dict:
         self._ensure()
-        resp = self._client.messages.create(
+        # 20 строк на 16 кандидатов — это десятки тысяч токенов ответа, которые
+        # физически не успеют записаться за базовый таймаут. Ждём соразмерно
+        # запрошенному объёму, но не бесконечно.
+        timeout = min(self.TIMEOUT_MAX_S,
+                      self.TIMEOUT_S + max_tokens / self.TOKENS_PER_S)
+        resp = self._client.with_options(timeout=timeout).messages.create(
             model=self.model,
             max_tokens=max_tokens,
             system=system or self._system(),
