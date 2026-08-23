@@ -13,6 +13,7 @@ LITE = os.environ.get("RHYMER_LITE") == "1"
 datas = [
     ("src/View/assets", "View/assets"),   # фоны интерфейса
     ("poems", "poems"),                   # корпус классики для офлайн-генератора
+    ("resources", "resources"),           # свод правил о смысле для промпта
 ]
 binaries = []
 

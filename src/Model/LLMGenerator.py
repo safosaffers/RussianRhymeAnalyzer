@@ -3,6 +3,7 @@ import json
 import os
 
 from Model.Generator import Generator, GenParams
+from Model.Poetics import poetics_text
 
 # по умолчанию — самая способная модель; можно переопределить через окружение
 DEFAULT_MODEL = os.environ.get("RHYMER_MODEL", "claude-opus-4-8")
@@ -43,12 +44,28 @@ class LLMGenerator(Generator):
             import anthropic
             self._client = anthropic.Anthropic()   # ключ из ANTHROPIC_API_KEY
 
-    def _ask(self, user: str, schema: dict, max_tokens: int = 4000) -> dict:
+    @staticmethod
+    def _system() -> list:
+        """Системный промпт блоками: роль + свод правил о смысле.
+
+        Префикс стабилен от вызова к вызову, поэтому помечаем его
+        cache_control — за серию вызовов (генерация, правка) он оплачивается
+        один раз. Всё переменное уходит в сообщение пользователя, после
+        точки останова кеша."""
+        blocks = [{"type": "text", "text": SYSTEM}]
+        rules = poetics_text()
+        if rules:
+            blocks.append({"type": "text", "text": rules,
+                           "cache_control": {"type": "ephemeral"}})
+        return blocks
+
+    def _ask(self, user: str, schema: dict, max_tokens: int = 4000,
+             system: list = None) -> dict:
         self._ensure()
         resp = self._client.messages.create(
             model=self.model,
             max_tokens=max_tokens,
-            system=SYSTEM,
+            system=system or self._system(),
             messages=[{"role": "user", "content": user}],
             output_config={"format": {"type": "json_schema", "schema": schema}},
         )
