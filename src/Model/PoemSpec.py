@@ -42,10 +42,26 @@ class PoemSpec:
     punchline: str = ""
     forbidden: list = field(default_factory=list)
 
+    LIST_FIELDS = ("objects", "forbidden")
+
     @classmethod
     def from_dict(cls, d: dict) -> "PoemSpec":
-        """Карта из ответа модели: лишние ключи игнорируем, недостающие пустые."""
-        known = {f: d.get(f) for f in cls.__dataclass_fields__ if d.get(f) is not None}
+        """Карта из ответа модели: лишние ключи игнорируем, недостающие пустые.
+
+        Провайдеры без гарантии схемы возвращают что угодно, поэтому типы
+        приводим здесь: строка вместо списка — не повод уронить конвейер."""
+        known = {}
+        for f in cls.__dataclass_fields__:
+            v = (d or {}).get(f)
+            if v is None:
+                continue
+            if f in cls.LIST_FIELDS:
+                v = [str(x).strip() for x in (v if isinstance(v, (list, tuple))
+                                              else str(v).split(","))
+                     if str(x).strip()]
+            else:
+                v = str(v).strip()
+            known[f] = v
         return cls(**known)
 
     def to_prompt(self) -> str:

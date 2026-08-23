@@ -6,6 +6,9 @@ import os
 
 from Model.Generator import Generator, GenParams
 from Model.LLMGenerator import SYSTEM   # та же системная инструкция, что и для Claude
+from Model.Poetics import poetics_text
+from Model.PoemSpec import PoemSpec
+from Model import Roles
 
 # конфиги OpenAI-совместимых провайдеров
 PROVIDERS = {
@@ -78,12 +81,18 @@ class OpenAICompatGenerator(Generator):
             self._client = OpenAI(api_key=os.environ[self.key_env],
                                   base_url=self.base_url)
 
+    @staticmethod
+    def _system_text() -> str:
+        """Роль плюс свод правил о смысле — тот же, что уходит Claude."""
+        rules = poetics_text()
+        return f"{SYSTEM}\n\n{rules}" if rules else SYSTEM
+
     def _ask(self, user: str, max_tokens: int = 4000) -> dict:
         self._ensure()
         kwargs = dict(
             model=self.model,
             max_tokens=max_tokens,
-            messages=[{"role": "system", "content": SYSTEM},
+            messages=[{"role": "system", "content": self._system_text()},
                       {"role": "user", "content": user}],
             response_format={"type": "json_object"},
         )
@@ -122,9 +131,36 @@ class OpenAICompatGenerator(Generator):
             'Верни JSON строго вида: {"poems": ["стих1", "стих2", ...]} — '
             "массив из строк-стихов, без каких-либо пояснений."
         )
+        if params.spec is not None:                     # глубокий режим: пишем по карте
+            user = (
+                "Ты пишешь не по теме, а по готовому замыслу. Следуй ему.\n\n"
+                f"ЗАМЫСЕЛ:\n{params.spec.to_prompt()}\n\n" + user
+            )
         data = self._ask(user, max_tokens=400 + 120 * params.n_lines * n)
         poems = data.get("poems", [])
         return [p.strip() for p in poems if isinstance(p, str) and p.strip()]
+
+    # ---------- роли глубокого режима ----------
+    # Схему JSON эти провайдеры не гарантируют, поэтому структуру описываем
+    # словами (json_hint), а ответ нормализуем перед возвратом.
+    def plan(self, params: GenParams) -> PoemSpec:
+        user = (Roles.plan_prompt(params.theme.strip() or "свободная тема")
+                + Roles.json_hint(Roles.SPEC_SHAPE))
+        return PoemSpec.from_dict(self._ask(user, max_tokens=1500))
+
+    def judge(self, text: str, spec: PoemSpec = None) -> dict:
+        user = (Roles.judge_prompt(text, spec.to_prompt() if spec else "")
+                + Roles.json_hint(Roles.JUDGE_SHAPE))
+        return Roles.normalize_report(self._ask(user, max_tokens=2000))
+
+    def rework(self, text: str, claims: str, params: GenParams,
+               spec: PoemSpec = None) -> str:
+        user = (Roles.rework_prompt(text, claims, params.meter, params.scheme,
+                                    params.n_lines,
+                                    spec.to_prompt() if spec else "")
+                + Roles.json_hint(Roles.POEM_SHAPE))
+        data = self._ask(user, max_tokens=400 + 120 * params.n_lines)
+        return (data.get("poem") or "").strip()
 
     def improve(self, text: str, feedback: str, params: GenParams) -> str:
         """Самокоррекция: переписать стих, улучшив рифму по фидбэку оценщика."""
