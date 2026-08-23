@@ -1,19 +1,27 @@
 # -*- mode: python ; coding: utf-8 -*-
-# PyInstaller — ОБЛЕГЧЁННАЯ сборка Rhymer: детектор Юкавы + генерация (LLM).
-# БЕЗ torch и RPST (russian_scansion) — они исключены, поэтому образ компактный.
+# PyInstaller — сборка Rhymer: оба детектора рифмы (Юкава и RPST) + генерация (LLM).
+# RPST (russian_scansion) тянет torch и ~520 МБ моделей — образ получается большой.
 # Сборка:  pyinstaller --noconfirm rhymer.spec   ->   dist/Rhymer/
+# Лёгкая сборка без RPST (только Юкава):
+#          RHYMER_LITE=1 pyinstaller --noconfirm rhymer.spec
+import os
+
+from PyInstaller.utils.hooks import collect_all
+
+LITE = os.environ.get("RHYMER_LITE") == "1"
+
 datas = [
     ("src/View/assets", "View/assets"),   # фоны интерфейса
     ("poems", "poems"),                   # корпус классики для офлайн-генератора
 ]
+binaries = []
 
 # Генераторы импортируют SDK лениво — подсказываем сборщику.
 hiddenimports = ["anthropic", "openai"]
 
-# Исключаем тяжёлое и ненужное (главное — torch и RPST).
+# Исключаем тяжёлое и ненужное. torch и RPST выкидываем только в лёгкой сборке.
 excludes = [
-    "torch", "torchvision", "torchaudio",
-    "russian_scansion", "ufal", "ufal.udpipe", "transformers", "tokenizers",
+    "torchvision", "torchaudio", "transformers", "tokenizers",
     "scipy", "matplotlib", "pandas", "sympy", "numba", "sklearn",
     "IPython", "jupyter", "notebook", "tkinter", "PIL", "cv2",
     "PySide6.QtWebEngineCore", "PySide6.QtWebEngineWidgets",
@@ -21,10 +29,24 @@ excludes = [
     "PySide6.QtQuick", "PySide6.QtQml", "PySide6.QtPdf",
 ]
 
+if LITE:
+    excludes += ["torch", "russian_scansion", "ufal", "ufal.udpipe", "rusyllab"]
+else:
+    # RPST: сам пакет, его модели (каталог models/ лежит внутри пакета) и
+    # нативный ufal.udpipe. collect_all забирает данные, бинарники и подмодули.
+    for pkg in ("russian_scansion", "ufal", "rusyllab"):
+        pkg_datas, pkg_binaries, pkg_hidden = collect_all(pkg)
+        datas += pkg_datas
+        binaries += pkg_binaries
+        hiddenimports += pkg_hidden
+    # импортируются внутри функций RPST — сборщик их сам не находит
+    hiddenimports += ["torch", "huggingface_hub", "pyconll",
+                      "jellyfish", "jsonpickle", "coloredlogs"]
+
 a = Analysis(
     ["src/main.py"],
     pathex=["src"],
-    binaries=[],
+    binaries=binaries,
     datas=datas,
     hiddenimports=hiddenimports,
     hookspath=[],

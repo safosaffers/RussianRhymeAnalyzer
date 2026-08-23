@@ -1,9 +1,9 @@
-name: Build Rhymer (lite)
+name: Build Rhymer
 
-# Нативная сборка облегчённого приложения (детектор Юкавы + генерация) под
+# Нативная сборка приложения (оба детектора рифмы + генерация) под
 # Linux и Windows. PyInstaller собирает под ту ОС, где запущен, поэтому Windows
 # собирается на windows-runner, а Linux — на ubuntu-runner (кросс-компиляции нет).
-# Запуск вручную: вкладка Actions -> Build Rhymer (lite) -> Run workflow.
+# Запуск вручную: вкладка Actions -> Build Rhymer -> Run workflow.
 # На теге vX.Y.Z артефакты прикрепляются к GitHub Release.
 
 on:
@@ -38,6 +38,14 @@ jobs:
           python -m pip install --upgrade pip
           pip install pyinstaller
           pip install -r requirements-build.txt
+
+      - name: Install RPST (детектор ударений, размера, схемы)
+        run: |
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          git lfs install
+          git clone --depth 1 https://github.com/RussianNLP/RussianPoetryScansionTool.git third_party/RussianPoetryScansionTool
+          git -C third_party/RussianPoetryScansionTool lfs pull
+          pip install -e third_party/RussianPoetryScansionTool
 
       - name: Build (PyInstaller)
         run: pyinstaller --noconfirm rhymer.spec

@@ -1,6 +1,29 @@
-# Зависимости ОБЛЕГЧЁННОЙ сборки Rhymer (детектор Юкавы + генерация).
-# БЕЗ torch и russian_scansion (RPST) — они в эту сборку не входят.
+# Зависимости сборки Rhymer.
 PySide6>=6.7
 numpy>=1.26
 anthropic>=0.40      # провайдер Claude
 openai>=1.50         # провайдеры Gemini/DeepSeek (OpenAI-совместимый API)
+
+# --- RPST: детектор ударений, размера и схемы рифмовки ---
+# Зависимости самого RPST (сам пакет ставится из репозитория, см. ниже):
+huggingface_hub
+pyconll==3.2.0
+ufal.udpipe==1.3.1.1
+coloredlogs==15.0.1
+jellyfish==1.0.3
+jsonpickle==3.0.4
+six
+rusyllab @ git+https://github.com/Koziev/rusyllab
+#
+# torch ставится отдельно CPU-колесом (иначе pip тянет ~2.5 ГБ CUDA-пакетов):
+#   pip install torch --index-url https://download.pytorch.org/whl/cpu
+#
+# Сам RPST — из репозитория, модели лежат в git-lfs (~520 МБ):
+#   git lfs install
+#   git clone https://github.com/RussianNLP/RussianPoetryScansionTool.git \
+#             third_party/RussianPoetryScansionTool
+#   git -C third_party/RussianPoetryScansionTool lfs pull
+#   pip install -e third_party/RussianPoetryScansionTool
+#
+# Лёгкая сборка без RPST: хватает первых четырёх строк этого файла плюс
+#   RHYMER_LITE=1 pyinstaller --noconfirm rhymer.spec
