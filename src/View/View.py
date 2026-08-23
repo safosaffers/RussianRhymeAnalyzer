@@ -353,6 +353,7 @@ class View(QMainWindow):
                 "theme": self.theme_text(), "n_lines": self.n_lines(),
                 "meter": self.meter(), "scheme": self.scheme(),
                 "n": self.n_candidates(), "use_llm": self.use_llm(),
+                "use_deep": self.use_deep(),
             },
             "method": self.rhyme_method(),
             "yukawa": self.yukawa_params(),
@@ -368,6 +369,8 @@ class View(QMainWindow):
         self.sb_n.setValue(int(g.get("n", 6)))
         if self.cb_llm.isEnabled():
             self.cb_llm.setChecked(bool(g.get("use_llm", self.cb_llm.isChecked())))
+        if self.cb_deep.isEnabled():
+            self.cb_deep.setChecked(bool(g.get("use_deep", self.cb_deep.isChecked())))
         method = st.get("method", "yukawa")
         for i, (_, val) in enumerate(METHODS):
             if val == method:
@@ -474,6 +477,9 @@ class View(QMainWindow):
         form.addRow("Кандидатов (N):", self.sb_n)
         self.cb_llm = QCheckBox("Генерировать через ИИ")
         form.addRow(self.cb_llm)
+        self.cb_deep = QCheckBox("Глубокий режим: замысел, оценка, правка")
+        self.cb_deep.setEnabled(False)
+        form.addRow(self.cb_deep)
         params.setStyleSheet(_glass_panel_qss())   # «стеклянная» панель — виден фон
         self.sec_params = CollapsibleSection("Параметры генерации", params)
         left.addWidget(self.sec_params)
@@ -504,6 +510,10 @@ class View(QMainWindow):
         right.addWidget(self.l_gen_metrics)
         self.l_gen_legend = QLabel(""); self.l_gen_legend.setWordWrap(True)
         right.addWidget(self.l_gen_legend)
+        # разбор глубокого режима: балл рубрики и что именно чинить
+        self.l_gen_review = QLabel(""); self.l_gen_review.setWordWrap(True)
+        self.l_gen_review.setVisible(False)
+        right.addWidget(self.l_gen_review)
         self.btn_improve = QPushButton("✨ Улучшить рифму (ИИ)")
         self.btn_improve.setEnabled(False)
         self.btn_improve.setToolTip("Перерифмовать выбранный вариант: оставить "
@@ -629,6 +639,7 @@ class View(QMainWindow):
     def n_candidates(self): return self.sb_n.value()
     def rhyme_method(self): return METHODS[self.cb_method.currentIndex()][1]
     def use_llm(self): return self.cb_llm.isChecked()
+    def use_deep(self): return self.cb_deep.isChecked()
     def eval_text(self): return self.pte_input.toPlainText()
 
     def set_llm_available(self, available: bool, name: str = "", provider: str = "anthropic"):
@@ -642,6 +653,35 @@ class View(QMainWindow):
         self.cb_llm.setChecked(available)
         self._llm_ok = available
         self.btn_improve.setEnabled(available)
+
+    def set_deep_available(self, available: bool):
+        """Глубокий режим есть не у всех провайдеров: у OpenAI-совместимых
+        ответ по схеме не гарантирован, поэтому там галочка недоступна."""
+        self.cb_deep.setEnabled(available)
+        if not available:
+            self.cb_deep.setChecked(False)
+        self.cb_deep.setToolTip(
+            "Стих собирается по карте смысла, оценивается по рубрике и правится "
+            "по названным претензиям. Дольше и дороже обычной генерации: "
+            "несколько запросов к модели вместо одного."
+            if available else
+            "Доступно только для Claude: остальные провайдеры не гарантируют "
+            "ответ по схеме.")
+
+    def set_review(self, report: dict, traces: list):
+        """Разбор глубокого режима под метриками. Пустой разбор — скрываем."""
+        rows = []
+        if report:
+            rows.append(f"<b>Смысл: {report.get('total', 0)} из 30.</b> "
+                        f"{report.get('verdict', '')}")
+            for it in report.get("issues", []):
+                where = f"строка {it['line']}" if it.get("line") else "весь стих"
+                rows.append(f"- {where}: {it.get('symptom', '')} -> {it.get('fix', '')}")
+        for t in traces or []:
+            where = f"строка {t['line']}" if t.get("line") else "весь стих"
+            rows.append(f"- машинный след, {where}: {t['msg']}")
+        self.l_gen_review.setText("<br>".join(rows))
+        self.l_gen_review.setVisible(bool(rows))
 
     # ---------- статус / занятость ----------
     def set_status(self, msg: str):

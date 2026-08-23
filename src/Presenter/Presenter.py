@@ -9,14 +9,17 @@ class Worker(QObject):
     в отдельном потоке. ВАЖНО: здесь только вычисления, без виджетов."""
     done = Signal(object)
     failed = Signal(str)
+    progress = Signal(str)     # стадия длинной цепочки — чтобы статус не молчал
 
-    def __init__(self, fn):
+    def __init__(self, fn, with_progress: bool = False):
         super().__init__()
         self.fn = fn
+        self.with_progress = with_progress
 
     def run(self):
         try:
-            self.done.emit(self.fn())
+            self.done.emit(self.fn(self.progress.emit) if self.with_progress
+                           else self.fn())
         except Exception as e:   # noqa: BLE001
             self.failed.emit(repr(e))
 
@@ -51,6 +54,7 @@ class Presenter(QObject):
         self._eval_threads = set()   # живые потоки анализа (держим от сборки мусора)
 
         self.v.set_llm_available(self.m.llm_available, self.m.llm_name, self.m.provider)
+        self.v.set_deep_available(self.m.deep_available)
         self.v.btn_generate.clicked.connect(self.on_generate)
         self.v.btn_improve.clicked.connect(self.on_improve)
         self.v.candidate_selected.connect(self.on_select)
@@ -62,19 +66,21 @@ class Presenter(QObject):
     def on_settings(self, cfg):
         self.m.reload_llm()
         self.v.set_llm_available(self.m.llm_available, self.m.llm_name, self.m.provider)
+        self.v.set_deep_available(self.m.deep_available)
         ok = "доступен" if self.m.llm_available else "ключ не задан/нет пакета"
         self.v.set_status(f"Настройки применены: провайдер {self.m.provider} ({ok})")
 
     # ---------- асинхронный запуск ----------
-    def _run_async(self, fn):
+    def _run_async(self, fn, with_progress: bool = False):
         if self._thread is not None:        # уже идёт работа
             return
         self.v.set_busy(True)
         self._thread = QThread()
-        self._worker = Worker(fn)
+        self._worker = Worker(fn, with_progress)
         self._worker.moveToThread(self._thread)
         self._thread.started.connect(self._worker.run)
         # слоты-методы Presenter -> очередь в главный поток (безопасно для UI)
+        self._worker.progress.connect(self._on_progress)
         self._worker.done.connect(self._on_done)
         self._worker.failed.connect(self._on_failed)
         self._worker.done.connect(self._thread.quit)
@@ -87,9 +93,14 @@ class Presenter(QObject):
         self._worker = None
         self.v.set_busy(False)
 
+    def _on_progress(self, stage: str):
+        self.v.set_status(f"Глубокий режим: {stage}…")
+
     def _on_done(self, result):
         if self._mode == "gen":
             self._on_generated(result)
+        elif self._mode == "deep":
+            self._on_composed(result)
         elif self._mode == "improve":
             self._on_improved(result)
         else:
@@ -116,10 +127,34 @@ class Presenter(QObject):
         # Юкаве передаём те же параметры из «Настройка Юкавы», что и на вкладке
         # «Оценка рифм», — иначе выделения для одного текста расходятся.
         yk = self.v.yukawa_params() if method == "yukawa" else None
+        if use_llm and self.v.use_deep() and self.m.deep_available:
+            self._mode = "deep"
+            self.v.set_status(f"Глубокий режим ({src}), детектор: {det}…{note}")
+            self._run_async(
+                lambda step: self.m.compose_deep(p, n, method, yk, on_step=step),
+                with_progress=True)
+            return
         self.v.set_status(f"Генерация ({src}), детектор: {det}…{note}")
         self._run_async(lambda: self.m.generate_best(p, n, use_llm, method, yk))
 
+    def _on_composed(self, res):
+        """Результат глубокого режима: текст, разбор и история правок."""
+        if not res:
+            self.v.set_status("Глубокий режим недоступен для этого провайдера")
+            return
+        text, m = res["text"], res["metrics"]
+        self._current_gen = (text, m)
+        self.last_scored = res["candidates"]
+        self.v.set_gen_result(text, m)
+        self.v.set_candidates(res["candidates"])
+        self.v.set_review(res["report"], res["traces"])
+        self.v.show_generated_layout()
+        total = (res["report"] or {}).get("total", 0)
+        self.v.set_status(f"Готово: смысл {total} из 30, "
+                          f"машинных признаков {len(res['traces'])}")
+
     def _on_generated(self, scored):
+        self.v.set_review(None, None)      # обычный режим: разбора нет
         self.last_scored = scored
         if scored:
             best_text, best_m = scored[0]
