@@ -4,6 +4,7 @@ import os
 
 from Model.Generator import Generator, GenParams
 from Model.Poetics import poetics_text
+from Model.PoemSpec import PoemSpec, SCHEMA as SPEC_SCHEMA
 
 # по умолчанию — самая способная модель; можно переопределить через окружение
 DEFAULT_MODEL = os.environ.get("RHYMER_MODEL", "claude-opus-4-8")
@@ -78,6 +79,29 @@ class LLMGenerator(Generator):
         )
         text = next((b.text for b in resp.content if b.type == "text"), "{}")
         return json.loads(text)
+
+    def plan(self, params: GenParams) -> PoemSpec:
+        """Карта стиха до генерации: замысел, говорящий, сцена.
+
+        Роль задаётся в сообщении пользователя, а не в system: системный
+        префикс общий для всех ролей и потому кешируется целиком."""
+        theme = params.theme.strip() or "свободная тема"
+        user = (
+            "Сейчас ты не пишешь стих, а готовишь замысел. Верни карту будущего "
+            f"стихотворения на тему: {theme}.\n"
+            "Требования к карте:\n"
+            "- thought: одна мысль одним предложением, без красивостей;\n"
+            "- occasion: что заставило говорить именно сейчас (событие, час, место);\n"
+            "- objects: 4-6 конкретных предметов и деталей, которые можно потрогать "
+            "или увидеть; никаких отвлечённых слов;\n"
+            "- motion: режим движения (медитативный, аргументативный, ассоциативный, "
+            "каталог, сопоставление) и в какой примерно строке перелом;\n"
+            "- speaker: живой человек с возрастом, занятием и усталостью, а не «поэт»;\n"
+            "- scene: где и когда он это произносит, что у него перед глазами;\n"
+            "- punchline: чем кончается, без морали и без объясняющей строки;\n"
+            "- forbidden: 3-5 слов, которых этот говорящий не скажет."
+        )
+        return PoemSpec.from_dict(self._ask(user, SPEC_SCHEMA, max_tokens=1200))
 
     def generate(self, params: GenParams, n: int) -> list[str]:
         theme = params.theme.strip() or "свободная тема"
