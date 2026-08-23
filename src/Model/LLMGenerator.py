@@ -80,6 +80,69 @@ class LLMGenerator(Generator):
         text = next((b.text for b in resp.content if b.type == "text"), "{}")
         return json.loads(text)
 
+    # Рубрика §11: десять критериев по 0-3 балла, максимум 30.
+    RUBRIC = {
+        "occasion": "есть ли повод: почему это сказано именно сейчас",
+        "stakes": "что поставлено на карту, что теряется",
+        "concretion": "конкретные предметы против отвлечённых слов",
+        "figuration": "работают ли образы и сравнения, нет ли стёртых",
+        "tension": "есть ли сила, тянущая в другую сторону",
+        "turn": "есть ли поворот, узнаёт ли стих что-то к концу",
+        "voice": "цельность голоса, соответствие говорящему",
+        "form": "оправданы ли строки и строфы, работает ли разбивка",
+        "closure": "финал завершает, не объясняя",
+        "surprise": "есть ли непредсказуемость, не собран ли стих из готового",
+    }
+    JUDGE_SCHEMA = {
+        "type": "object",
+        "properties": {
+            "scores": {
+                "type": "object",
+                "properties": {k: {"type": "integer"} for k in RUBRIC},
+                "required": list(RUBRIC),
+                "additionalProperties": False,
+            },
+            "total": {"type": "integer"},
+            "issues": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "line": {"type": "integer"},
+                        "symptom": {"type": "string"},
+                        "fix": {"type": "string"},
+                    },
+                    "required": ["line", "symptom", "fix"],
+                    "additionalProperties": False,
+                },
+            },
+            "verdict": {"type": "string"},
+        },
+        "required": ["scores", "total", "issues", "verdict"],
+        "additionalProperties": False,
+    }
+
+    def judge(self, text: str, spec: PoemSpec = None) -> dict:
+        """Смысловая оценка по рубрике: баллы, адресные претензии, вердикт.
+
+        Отдельный вызов, а не продолжение диалога с генератором: модель,
+        которая оценивает собственный черновик в том же контексте, завышает
+        балл. Оценивается один текст — формальный отбор по рифме уже сделан."""
+        rubric = "\n".join(f"- {k}: {v}" for k, v in self.RUBRIC.items())
+        user = (
+            "Сейчас ты не пишешь стих, а оцениваешь чужой. Будь строгим: "
+            "средний балл по критерию — 1, три ставится только за то, что "
+            "действительно работает.\n\n"
+            f"СТИХ:\n{text}\n\n"
+            + (f"ЗАМЫСЕЛ, по которому он писался:\n{spec.to_prompt()}\n\n" if spec else "")
+            + f"Оцени по каждому критерию от 0 до 3:\n{rubric}\n\n"
+            "total — сумма баллов. issues — конкретные претензии: line (номер "
+            "строки, 0 если про весь стих), symptom (что не так, словами из "
+            "свода правил), fix (что именно сделать). Не больше пяти претензий, "
+            "самые важные. verdict — одно предложение о стихе в целом."
+        )
+        return self._ask(user, self.JUDGE_SCHEMA, max_tokens=1500)
+
     def plan(self, params: GenParams) -> PoemSpec:
         """Карта стиха до генерации: замысел, говорящий, сцена.
 
