@@ -15,6 +15,7 @@ from PySide6.QtGui import QAction, QPainter, QColor, QPixmap, QIcon
 from PySide6.QtCore import Qt, Signal, QRect
 
 from View.SettingsDialog import SettingsDialog, save_settings, apply_to_env
+from View.TechniqueDialog import TechniqueDialog
 from Model.Session import save_session, load_session
 
 METERS = ["ямб", "хорей", "дактиль", "амфибрахий", "анапест"]
@@ -250,6 +251,7 @@ class View(QMainWindow):
         self._dirty = False
         self._llm_ok = False
         self.setWindowTitle(self.TITLE)
+        self._techniques = []          # [{id, param}] — требования к технике
         icon = _load_pix("icon.png")
         if icon is not None:
             self.setWindowIcon(QIcon(icon))
@@ -354,6 +356,7 @@ class View(QMainWindow):
                 "meter": self.meter(), "scheme": self.scheme(),
                 "n": self.n_candidates(), "use_llm": self.use_llm(),
                 "use_deep": self.use_deep(),
+                "techniques": self.techniques(),
             },
             "method": self.rhyme_method(),
             "yukawa": self.yukawa_params(),
@@ -371,6 +374,8 @@ class View(QMainWindow):
             self.cb_llm.setChecked(bool(g.get("use_llm", self.cb_llm.isChecked())))
         if self.cb_deep.isEnabled():
             self.cb_deep.setChecked(bool(g.get("use_deep", self.cb_deep.isChecked())))
+        self._techniques = [r for r in g.get("techniques", []) if isinstance(r, dict)]
+        self._show_techniques()
         method = st.get("method", "yukawa")
         for i, (_, val) in enumerate(METHODS):
             if val == method:
@@ -480,6 +485,11 @@ class View(QMainWindow):
         self.cb_deep = QCheckBox("Глубокий режим: замысел, оценка, правка")
         self.cb_deep.setEnabled(False)
         form.addRow(self.cb_deep)
+        self.btn_tech = QPushButton("Требования к технике…")
+        self.btn_tech.clicked.connect(self._open_techniques)
+        self.l_tech = QLabel("не заданы"); self.l_tech.setWordWrap(True)
+        form.addRow(self.btn_tech)
+        form.addRow("Техника:", self.l_tech)
         params.setStyleSheet(_glass_panel_qss())   # «стеклянная» панель — виден фон
         self.sec_params = CollapsibleSection("Параметры генерации", params)
         left.addWidget(self.sec_params)
@@ -640,6 +650,27 @@ class View(QMainWindow):
     def rhyme_method(self): return METHODS[self.cb_method.currentIndex()][1]
     def use_llm(self): return self.cb_llm.isChecked()
     def use_deep(self): return self.cb_deep.isChecked()
+    def techniques(self): return list(self._techniques)
+
+    def set_n_lines(self, n: int):
+        """Длину диктует техника (акростих): показываем её пользователю."""
+        self.sb_lines.setValue(int(n))
+
+    def _open_techniques(self):
+        dlg = TechniqueDialog(self, self._techniques)
+        if dlg.exec():
+            self._techniques = dlg.result_techniques()
+            self._show_techniques()
+            self.tune_changed.emit()      # пересчитать разбор с новыми требованиями
+
+    def _show_techniques(self):
+        if not self._techniques:
+            self.l_tech.setText("не заданы")
+            return
+        from Model.Techniques import TECHNIQUES as _T
+        self.l_tech.setText("; ".join(
+            _T[r["id"]]["label"] + (f" «{r['param']}»" if r.get("param") else "")
+            for r in self._techniques if r["id"] in _T))
     def eval_text(self): return self.pte_input.toPlainText()
 
     def set_llm_available(self, available: bool, name: str = "", provider: str = "anthropic"):
@@ -770,12 +801,27 @@ class View(QMainWindow):
         base = (f"Зарифмовано слогов: <b>{m.get('rhyme_percent', 0):.0%}</b>"
                 f" ({m.get('rhymed_syllables', 0)} из {m.get('total_syllables', 0)})")
         if m.get("method") == "yukawa":
-            return ("[Юкава] " + base
+            head = ("[Юкава] " + base
                     + f"   |   Групп рифм: <b>{m.get('num_groups', 0)}</b>")
-        return (base
-                + f"   |   Поэтичность RPST: <b>{m.get('score', 0):.2f}</b>"
-                + f"   |   Размер: <b>{m.get('meter') or '—'}</b>"
-                + f"   |   Схема: <b>{m.get('detected_scheme') or '—'}</b>")
+        else:
+            head = (base
+                    + f"   |   Поэтичность RPST: <b>{m.get('score', 0):.2f}</b>"
+                    + f"   |   Размер: <b>{m.get('meter') or '—'}</b>"
+                    + f"   |   Схема: <b>{m.get('detected_scheme') or '—'}</b>")
+        return head + View._fmt_techniques(m.get("techniques"))
+
+    @staticmethod
+    def _fmt_techniques(results: list) -> str:
+        """Проверка техники под метриками: что выдержано, а что нет и почему."""
+        if not results:
+            return ""
+        rows = []
+        for r in results:
+            mark = "✔" if r["ok"] else "✘"
+            detail = html.escape(r.get("detail") or "")
+            rows.append(f"{mark} <b>{html.escape(r['label'])}</b>"
+                        + (f" - {detail}" if detail else ""))
+        return "<br>Техника: " + "; ".join(rows)
 
     # ---------- темы ----------
     def toggle_theme(self):

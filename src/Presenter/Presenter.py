@@ -2,6 +2,7 @@
 from PySide6.QtCore import QObject, QThread, Signal, QTimer
 
 from Model.Generator import GenParams
+from Model.Techniques import required_lines
 
 
 class Worker(QObject):
@@ -116,8 +117,13 @@ class Presenter(QObject):
         if use_llm and not self.m.llm_available:   # галочка есть, ключа нет
             self.v.show_llm_help()
             return
+        reqs = self.v.techniques()
+        need = required_lines(reqs)
+        if need and need != self.v.n_lines():
+            self.v.set_n_lines(need)      # акростих и родня задают длину жёстко
         p = GenParams(theme=self.v.theme_text(), n_lines=self.v.n_lines(),
-                      meter=self.v.meter(), scheme=self.v.scheme())
+                      meter=self.v.meter(), scheme=self.v.scheme(),
+                      techniques=reqs)
         n = self.v.n_candidates()
         method = self.v.rhyme_method()
         self._mode = "gen"
@@ -176,7 +182,8 @@ class Presenter(QObject):
             return
         text, _ = self._current_gen
         p = GenParams(theme=self.v.theme_text(), n_lines=self.v.n_lines(),
-                      meter=self.v.meter(), scheme=self.v.scheme())
+                      meter=self.v.meter(), scheme=self.v.scheme(),
+                      techniques=self.v.techniques())
         method = self.v.rhyme_method()
         yk = self.v.yukawa_params() if method == "yukawa" else None
         self._mode = "improve"
@@ -232,7 +239,9 @@ class Presenter(QObject):
             else:
                 self.v.set_status(f"{det}: анализ готов")
 
-        self._run_eval_async(lambda: self.m.evaluate(text, scheme, method, yk), tok, on_ok)
+        reqs = self.v.techniques()
+        self._run_eval_async(
+            lambda: self.m.evaluate(text, scheme, method, yk, reqs), tok, on_ok)
 
     def _run_eval_async(self, fn, tok, on_ok):
         """Считает анализ в отдельном потоке (UI не блокируется). Результат
