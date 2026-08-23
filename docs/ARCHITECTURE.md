@@ -12,7 +12,11 @@ src/
   Model/                      бизнес-логика (без Qt)
     Model.py                  фасад: evaluate(...), generate_best(...)
     Generator.py              Generator(ABC) + StubGenerator (корпус poems/)
-    LLMGenerator.py           генератор на Claude API + самокоррекция improve()
+    LLMGenerator.py           Claude API: роли generate/plan/judge/rework
+    PoemSpec.py               карта смысла: 7 шагов замысла + повод, лицо, сцена
+    Poetics.py                загрузка свода правил (resources/poetics.md)
+    AiTraces.py               детерминированный детектор машинного следа
+    Pipeline.py               глубокий режим: замысел -> черновики -> оценка -> правка
     RhymeEvaluator.py         детектор "rpst": обёртка RPST + матчер хвостов
     YukawaDetector.py         детектор "yukawa": авторский алгоритм
     Phonetics.py              векторизация слогов: схожесть = косинус признаков
@@ -25,6 +29,10 @@ src/
   Research/
     detector.py               прототип детектора Юкавы (matplotlib-визуализация)
 ```
+
+Свод правил о смысле стиха, который подмешивается в системный промпт, —
+в `resources/poetics.md` (полный справочник — `docs/sense-and-structure.html`,
+схема конвейера — `docs/poem-pipeline.drawio`).
 
 Документация и план — в `docs/`. Корпус классики — в `poems/`. Скриншоты UI —
 в `Rhymer/`.
@@ -57,15 +65,24 @@ src/
 - **`gen`** — `Model.generate_best(params, n, use_llm, method)`:
   генерим N кандидатов выбранным генератором → каждого оцениваем детектором →
   сортируем по убыванию `rhyme_score`. Для LLM, если у лучшего
-  `rhyme_accuracy < 1.0`, добавляется один вызов `improve()` с текстовым
-  фидбэком оценщика, результат тоже скорится и пересортировывается.
+  детектор нашёл незарифмованные строки (`needs_rhyme_fix`), добавляется один
+  вызов `improve()` с построчным разбором рифмы, результат тоже скорится и
+  пересортировывается.
+- **`deep`** — `Model.compose_deep(params, n, method, yk_params, on_step)`:
+  `Pipeline.compose()` строит карту смысла (`plan`), генерит по ней N
+  черновиков, отбирает лучший по рифме, оценивает по рубрике из 10 критериев
+  (`judge`) и детектором машинного следа (`ai_traces`), затем одним вызовом
+  `rework()` чинит названные претензии. Правка принимается, только если
+  смысловой балл не упал. Роли есть лишь у `LLMGenerator`, поэтому режим
+  закрыт флагом `Model.deep_available`.
 - **`eval`** — `Model.evaluate(text, scheme, method, yk_params)`: оценка
   пользовательского стиха.
 
 ## Асинхронность
 
 Загрузка моделей RPST (~15–30 с на первом вызове), генерация и оценка идут в
-`QThread` через `Presenter.Worker` (сигналы `done`/`failed`). UI не виснет;
+`QThread` через `Presenter.Worker` (сигналы `done`/`failed`/`progress`;
+`progress` показывает стадию длинной цепочки глубокого режима). UI не виснет;
 во время работы — `set_busy(True)`. Исключение — живой тюнинг Юкавы
 (`on_tune`): он быстрый и считается прямо в главном потоке.
 
@@ -80,7 +97,7 @@ src/
 |---|---|
 | `rhyme_score` | балл для ранжирования best-of-N |
 | `rhyme_percent` | доля зарифмованных слогов |
-| `rhyme_accuracy` | точность рифмовки по заданной схеме |
+| `rhyme_accuracy` | RPST: точность по заданной схеме; Юкава: доля зарифмованных слогов (схему она не проверяет) |
 | `colored_lines` | строки, разбитые на сегменты `(текст, цвет\|None)` |
 | `legend` | цвет → список созвучных окончаний/слогов |
 | `total_syllables`, `rhymed_syllables` | счётчики слогов |
@@ -89,6 +106,7 @@ src/
 `detected_scheme`; Юкава — `num_groups`, `params`, `method`.)
 
 **Единый интерфейс генератора** — `generate(params: GenParams, n) -> list[str]`
+(в глубоком режиме карта смысла едет в `GenParams.spec`; заглушка её игнорирует)
 (каждый кандидат — строки через `\n`). Реализации `StubGenerator` и
 `LLMGenerator` взаимозаменяемы без изменения UI. LLM включается, только если
 есть `ANTHROPIC_API_KEY` и установлен пакет `anthropic`
