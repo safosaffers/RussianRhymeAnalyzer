@@ -9,7 +9,8 @@ from Model.LLMGenerator import LLMGenerator
 from Model.OpenAICompatGenerator import OpenAICompatGenerator
 from Model.RhymeEvaluator import RhymeEvaluator
 from Model.YukawaDetector import YukawaDetector
-from Model.RhymeFeedback import rhyme_feedback, rhyme_split
+from Model.RhymeFeedback import rhyme_feedback, needs_rhyme_fix
+from Model.Pipeline import compose
 
 
 class Model:
@@ -99,19 +100,23 @@ class Model:
         im["unchanged"] = improved.strip() == text.strip()
         return improved, im
 
-    @staticmethod
-    def _needs_rework(m: dict) -> bool:
-        """Нужен ли проход самокоррекции: есть незарифмованные строки, либо
-        детектор действительно проверяет схему и она не выдержана.
+    @property
+    def deep_available(self) -> bool:
+        """Глубокий режим требует ролей plan/judge/rework. Они есть только у
+        Anthropic-генератора: у OpenAI-совместимых провайдеров ответ по схеме
+        не гарантирован, поэтому режим там просто недоступен."""
+        return all(hasattr(self.llm, r) for r in ("plan", "judge", "rework"))
 
-        rhyme_accuracy в условие напрямую не берём: у Юкавы это доля
-        зарифмованных слогов (схема не проверяется, detected_scheme=None), она
-        почти никогда не равна 1.0 — по такому условию правка запускалась бы
-        всегда, добавляя лишний вызов API к каждой генерации."""
-        _, unrhymed = rhyme_split(m)
-        if unrhymed:
-            return True
-        return bool(m.get("detected_scheme")) and m.get("rhyme_accuracy", 1.0) < 1.0
+    def compose_deep(self, params: GenParams, n: int = 6, method: str = "yukawa",
+                     yk_params: dict = None, on_step=None) -> dict:
+        """Глубокий режим: замысел -> черновики -> оценка -> адресная правка.
+        None, если активный генератор эти роли не умеет."""
+        if not self.deep_available:
+            return None
+        det = self._detector(method)
+        return compose(self.llm,
+                       lambda t: self._score(det, t, params.scheme, yk_params),
+                       params, n=n, on_step=on_step)
 
     def generate_best(self, params: GenParams, n: int = 6, use_llm: bool = False,
                       method: str = "yukawa", yk_params: dict = None) -> list[tuple[str, dict]]:
@@ -129,7 +134,7 @@ class Model:
 
         if use_llm and self.llm and scored:
             best_text, best_m = scored[0]
-            if self._needs_rework(best_m):
+            if needs_rhyme_fix(best_m):
                 feedback = rhyme_feedback(best_m, params.scheme)
                 improved = self.llm.improve(best_text, feedback, params)
                 if improved:

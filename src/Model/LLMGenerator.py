@@ -177,6 +177,11 @@ class LLMGenerator(Generator):
             f"Каждый вариант — ровно {params.n_lines} строк, строки разделяй '\\n'. "
             f"Добивайся точной рифмы по схеме {params.scheme}."
         )
+        if params.spec is not None:                     # глубокий режим: пишем по карте
+            user = (
+                "Ты пишешь не по теме, а по готовому замыслу. Следуй ему.\n\n"
+                f"ЗАМЫСЕЛ:\n{params.spec.to_prompt()}\n\n" + user
+            )
         schema = {
             "type": "object",
             "properties": {"poems": {"type": "array", "items": {"type": "string"}}},
@@ -185,6 +190,31 @@ class LLMGenerator(Generator):
         }
         data = self._ask(user, schema, max_tokens=400 + 120 * params.n_lines * n)
         return [p.strip() for p in data.get("poems", []) if p.strip()]
+
+    def rework(self, text: str, claims: str, params: GenParams,
+               spec: PoemSpec = None) -> str:
+        """Правка по адресным претензиям: рифма, смысл и машинный след разом.
+
+        Отдельно от improve(): тот чинит только рифму и вызывается из ручного
+        улучшения — менять его промпт значило бы менять и ту кнопку."""
+        user = (
+            "Перепиши стихотворение, починив ТОЛЬКО перечисленное. Остальное "
+            "сохрани дословно: удачные строки не трогай.\n\n"
+            f"СТИХ:\n{text}\n\n"
+            f"ЧТО ПОЧИНИТЬ:\n{claims}\n\n"
+            + (f"ЗАМЫСЕЛ:\n{spec.to_prompt()}\n\n" if spec else "")
+            + f"Сохрани размер {params.meter}, схему рифмовки {params.scheme} и "
+            f"ровно {params.n_lines} строк. Не добавляй вывод и мораль в финале. "
+            "Верни JSON с одним полем poem (строки через '\\n')."
+        )
+        schema = {
+            "type": "object",
+            "properties": {"poem": {"type": "string"}},
+            "required": ["poem"],
+            "additionalProperties": False,
+        }
+        data = self._ask(user, schema, max_tokens=400 + 120 * params.n_lines)
+        return (data.get("poem") or "").strip()
 
     def improve(self, text: str, feedback: str, params: GenParams) -> str:
         """Самокоррекция: переписать стих, улучшив рифму по фидбэку оценщика."""

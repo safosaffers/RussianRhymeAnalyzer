@@ -38,6 +38,19 @@ def rhyme_split(m: dict) -> tuple:
     return good, unrhymed
 
 
+def needs_rhyme_fix(m: dict) -> bool:
+    """Нужна ли правка рифмы: есть незарифмованные строки, либо детектор
+    действительно проверяет схему и она не выдержана.
+
+    rhyme_accuracy напрямую в условие не берём: у Юкавы это доля зарифмованных
+    слогов (схему она не проверяет, detected_scheme=None), она почти никогда не
+    равна 1.0 - по такому условию правка запускалась бы всегда."""
+    _, unrhymed = rhyme_split(m)
+    if unrhymed:
+        return True
+    return bool(m.get("detected_scheme")) and m.get("rhyme_accuracy", 1.0) < 1.0
+
+
 def rhyme_feedback(m: dict, scheme: str = None) -> str:
     """`m` — словарь детектора (с ключом colored_lines). Возвращает строку-разбор."""
     good, bad = rhyme_split(m)

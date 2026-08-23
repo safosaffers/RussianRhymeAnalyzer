@@ -12,6 +12,7 @@ class GenParams:
     n_lines: int = 4         # сколько строк в стихе
     meter: str = "ямб"       # желаемый размер
     scheme: str = "ABAB"     # желаемая схема рифмовки
+    spec: object = None      # PoemSpec: карта смысла; заглушка её игнорирует
 
 
 class Generator(ABC):
