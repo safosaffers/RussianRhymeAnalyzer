@@ -9,7 +9,7 @@ from Model.LLMGenerator import LLMGenerator
 from Model.OpenAICompatGenerator import OpenAICompatGenerator
 from Model.RhymeEvaluator import RhymeEvaluator
 from Model.YukawaDetector import YukawaDetector
-from Model.RhymeFeedback import rhyme_feedback
+from Model.RhymeFeedback import rhyme_feedback, rhyme_split
 
 
 class Model:
@@ -99,12 +99,27 @@ class Model:
         im["unchanged"] = improved.strip() == text.strip()
         return improved, im
 
+    @staticmethod
+    def _needs_rework(m: dict) -> bool:
+        """Нужен ли проход самокоррекции: есть незарифмованные строки, либо
+        детектор действительно проверяет схему и она не выдержана.
+
+        rhyme_accuracy в условие напрямую не берём: у Юкавы это доля
+        зарифмованных слогов (схема не проверяется, detected_scheme=None), она
+        почти никогда не равна 1.0 — по такому условию правка запускалась бы
+        всегда, добавляя лишний вызов API к каждой генерации."""
+        _, unrhymed = rhyme_split(m)
+        if unrhymed:
+            return True
+        return bool(m.get("detected_scheme")) and m.get("rhyme_accuracy", 1.0) < 1.0
+
     def generate_best(self, params: GenParams, n: int = 6, use_llm: bool = False,
                       method: str = "yukawa", yk_params: dict = None) -> list[tuple[str, dict]]:
         """Best-of-N: сгенерировать n кандидатов, оценить выбранным детектором,
         вернуть отсортированными по убыванию rhyme_score (лучший — первый).
 
-        Для ИИ-генератора добавляется один проход самокоррекции по фидбэку детектора.
+        Для ИИ-генератора добавляется один проход самокоррекции по фидбэку
+        детектора — но только если детектору есть на что пожаловаться.
         """
         det = self._detector(method)
         gen = self.llm if (use_llm and self.llm) else self.stub
@@ -114,12 +129,8 @@ class Model:
 
         if use_llm and self.llm and scored:
             best_text, best_m = scored[0]
-            if best_m["rhyme_accuracy"] < 1.0:
-                feedback = (
-                    f"зарифмовано {best_m['rhyme_percent']:.0%} слогов; "
-                    f"точность рифмовки по схеме {params.scheme}: "
-                    f"{best_m['rhyme_accuracy']:.0%}."
-                )
+            if self._needs_rework(best_m):
+                feedback = rhyme_feedback(best_m, params.scheme)
                 improved = self.llm.improve(best_text, feedback, params)
                 if improved:
                     im = self._score(det, improved, params.scheme, yk_params)

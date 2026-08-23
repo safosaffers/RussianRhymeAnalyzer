@@ -73,7 +73,11 @@ def apply_resonance(S, gamma=0.3):
 # ОБЁРТКА ДЛЯ ПРИЛОЖЕНИЯ
 # ============================================================
 class YukawaDetector:
-    """Детектор рифм по матрице связей Юкавы. Интерфейс — как у RhymeEvaluator.
+    """Детектор рифм по матрице связей Юкавы.
+
+    Отличия от RhymeEvaluator: evaluate() принимает третий параметр params;
+    схема рифмовки не распознаётся (detected_scheme=None), а rhyme_accuracy
+    здесь — доля зарифмованных слогов, а НЕ точность по целевой схеме.
 
     Все настраиваемые константы — в DEFAULTS; переопределяются через
     evaluate(..., params=...) (для подбора из UI)."""
@@ -142,6 +146,8 @@ class YukawaDetector:
         return {
             "score": 0.0, "meter": None, "rpst_scheme": None,
             "stressed": "", "tails": [],
+            # rhyme_accuracy=pct: ключ есть ради общего интерфейса, но смысл
+            # другой — это доля зарифмованных слогов, схему Юкава не проверяет
             "rhyme_accuracy": pct, "detected_scheme": None,
             "rhyme_score": pct, "rhyme_percent": pct,
             "rhymed_syllables": rhymed, "total_syllables": N,
