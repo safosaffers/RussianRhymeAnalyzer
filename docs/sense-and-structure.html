@@ -1,0 +1,1013 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sense &amp; Structure</title>
+<style>
+  :root{
+    --paper:#FCFCFE; --surface:#F2F4F9; --sunk:#E8ECF5;
+    --ink:#14161F; --ink-soft:#394054; --muted:#616A80;
+    --rule:#DBE0EC; --rule-soft:#EAEDF4;
+    --accent:#2B45CC; --accent-ink:#1F35A6;
+    --a10:rgba(43,69,204,.09); --a20:rgba(43,69,204,.17); --a30:rgba(43,69,204,.26); --a45:rgba(43,69,204,.38);
+    --rust:#9E3A26; --moss:#1D6547;
+    --mono:ui-monospace,"SF Mono","JetBrains Mono","Cascadia Mono",Menlo,Consolas,monospace;
+    --serif:"Iowan Old Style","Charter","Bitstream Charter","Palatino Linotype",Palatino,Georgia,serif;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --paper:#0D0F16; --surface:#141824; --sunk:#1A1F2E;
+      --ink:#E7EAF2; --ink-soft:#C3C9D8; --muted:#949CB2;
+      --rule:#242A3A; --rule-soft:#1B2130;
+      --accent:#8098FF; --accent-ink:#A8B7FF;
+      --a10:rgba(128,152,255,.10); --a20:rgba(128,152,255,.19); --a30:rgba(128,152,255,.29); --a45:rgba(128,152,255,.42);
+      --rust:#E39178; --moss:#63C79A;
+    }
+  }
+  :root[data-theme="dark"]{
+    --paper:#0D0F16; --surface:#141824; --sunk:#1A1F2E;
+    --ink:#E7EAF2; --ink-soft:#C3C9D8; --muted:#949CB2;
+    --rule:#242A3A; --rule-soft:#1B2130;
+    --accent:#8098FF; --accent-ink:#A8B7FF;
+    --a10:rgba(128,152,255,.10); --a20:rgba(128,152,255,.19); --a30:rgba(128,152,255,.29); --a45:rgba(128,152,255,.42);
+    --rust:#E39178; --moss:#63C79A;
+  }
+
+  body{background:var(--paper);color:var(--ink);font-family:var(--serif);font-size:17px;line-height:1.62;
+       -webkit-font-smoothing:antialiased;margin:0;}
+  ::selection{background:var(--a30);}
+  a{color:var(--accent-ink);text-decoration-thickness:.5px;text-underline-offset:2px;}
+  a:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:2px;}
+
+  .band{border-bottom:1px solid var(--rule);background:var(--surface);}
+  .shell{max-width:1200px;margin:0 auto;padding:0 28px;}
+  .masthead{padding:56px 0 40px;display:grid;gap:18px;max-width:56rem;}
+  .eyebrow{font:500 .72rem/1.4 var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--accent-ink);margin:0;}
+  h1{font-family:var(--serif);font-weight:400;font-size:clamp(2.5rem,6.4vw,4.1rem);line-height:1.02;letter-spacing:-.02em;
+     margin:0;text-wrap:balance;}
+  h1 em{font-style:italic;color:var(--accent-ink);}
+  .lede{font-size:1.16rem;color:var(--ink-soft);margin:0;max-width:46rem;}
+  .meta{display:flex;flex-wrap:wrap;gap:8px 20px;font:500 .72rem/1.5 var(--mono);letter-spacing:.06em;
+        text-transform:uppercase;color:var(--muted);padding-top:6px;border-top:1px solid var(--rule);}
+
+  .cols{max-width:1200px;margin:0 auto;padding:0 28px 96px;display:grid;grid-template-columns:214px minmax(0,1fr);gap:64px;align-items:start;}
+  nav.rail{position:sticky;top:24px;max-height:calc(100vh - 48px);overflow:auto;font-family:var(--sans);
+           padding:32px 0;display:grid;gap:4px;}
+  nav.rail .part{font:600 .68rem/1.4 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--accent-ink);
+                 margin:18px 0 6px;padding-bottom:6px;border-bottom:1px solid var(--rule);}
+  nav.rail .part:first-child{margin-top:0;}
+  nav.rail a{display:grid;grid-template-columns:24px 1fr;gap:6px;font-size:.82rem;line-height:1.35;color:var(--muted);
+             text-decoration:none;padding:3px 0;}
+  nav.rail a span{font:500 .7rem/1.6 var(--mono);color:var(--muted);opacity:.7;}
+  nav.rail a:hover{color:var(--accent-ink);}
+
+  main{padding:32px 0 0;min-width:0;}
+  section{padding:44px 0 8px;border-top:1px solid var(--rule);scroll-margin-top:20px;}
+  section:first-of-type{border-top:0;padding-top:16px;}
+  .num{font:500 .72rem/1.4 var(--mono);letter-spacing:.14em;color:var(--accent-ink);text-transform:uppercase;}
+  h2{font-weight:400;font-size:clamp(1.5rem,3vw,2rem);line-height:1.15;letter-spacing:-.015em;margin:.35rem 0 1rem;text-wrap:balance;}
+  h3{font:600 .74rem/1.5 var(--mono);letter-spacing:.13em;text-transform:uppercase;color:var(--ink-soft);
+     margin:2rem 0 .7rem;padding-bottom:.4rem;border-bottom:1px solid var(--rule-soft);}
+  p{margin:0 0 1rem;max-width:64ch;}
+  p.wide{max-width:72ch;}
+  .k{font-family:var(--mono);font-size:.86em;font-weight:600;color:var(--ink);}
+  .ru{font-family:var(--mono);font-size:.82em;color:var(--muted);}
+
+  dl.terms{display:grid;gap:.9rem;margin:0 0 1.2rem;max-width:70ch;}
+  dl.terms > div{display:grid;gap:.1rem;}
+  dl.terms dt{font:600 .84rem/1.45 var(--mono);color:var(--ink);letter-spacing:-.005em;}
+  dl.terms dd{margin:0;color:var(--ink-soft);font-size:.98rem;line-height:1.55;}
+  dl.terms dd b{font-weight:600;color:var(--ink);}
+
+  ol.steps{counter-reset:s;list-style:none;padding:0;margin:0 0 1.2rem;display:grid;gap:.55rem;max-width:68ch;}
+  ol.steps li{counter-increment:s;position:relative;padding-left:2.6rem;font-size:.98rem;color:var(--ink-soft);}
+  ol.steps li::before{content:counter(s,decimal-leading-zero);position:absolute;left:0;top:0;
+                      font:600 .72rem/2.2 var(--mono);color:var(--accent-ink);}
+  ol.steps li b{color:var(--ink);font-weight:600;}
+
+  ul.plain{list-style:none;padding:0;margin:0 0 1rem;display:grid;gap:.4rem;max-width:68ch;}
+  ul.plain li{padding-left:1.1rem;position:relative;font-size:.98rem;color:var(--ink-soft);}
+  ul.plain li::before{content:"";position:absolute;left:0;top:.62em;width:5px;height:1px;background:var(--accent);}
+
+  .scroll{overflow-x:auto;margin:0 0 1.4rem;padding-bottom:4px;}
+  table{border-collapse:collapse;width:100%;min-width:560px;font-size:.92rem;}
+  th{font:600 .68rem/1.4 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);text-align:left;
+     padding:0 14px .55rem 0;border-bottom:1px solid var(--rule);vertical-align:bottom;}
+  td{padding:.6rem 14px .6rem 0;border-bottom:1px solid var(--rule-soft);vertical-align:top;color:var(--ink-soft);}
+  td:first-child{color:var(--ink);font-family:var(--mono);font-size:.82rem;font-weight:600;line-height:1.5;white-space:nowrap;}
+  td.wrapc:first-child{white-space:normal;}
+
+  figure{margin:0 0 1.6rem;display:grid;gap:.7rem;}
+  figcaption{font:500 .72rem/1.5 var(--mono);letter-spacing:.04em;color:var(--muted);}
+
+  .atlas{display:grid;gap:9px;min-width:660px;}
+  .arow{display:grid;grid-template-columns:118px 1fr;gap:14px;align-items:center;}
+  .arow > b{font:600 .68rem/1.3 var(--mono);letter-spacing:.04em;color:var(--ink);text-align:right;}
+  .track{display:grid;gap:2px;}
+  .seg{font:500 9.5px/1.3 var(--mono);letter-spacing:.02em;color:var(--ink);background:var(--a10);
+       padding:7px 5px;border-radius:2px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;}
+  .t2{background:var(--a20);} .t3{background:var(--a30);} .t4{background:var(--a45);}
+  .ruler{display:grid;grid-template-columns:118px 1fr;gap:14px;font:500 .62rem/1 var(--mono);color:var(--muted);
+         letter-spacing:.1em;padding-bottom:2px;}
+  .ruler div{display:flex;justify-content:space-between;}
+
+  .arcs{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:18px;margin:0 0 1.4rem;}
+  .arc{display:grid;gap:6px;}
+  .arc svg{width:100%;height:auto;color:var(--accent);background:var(--surface);border-radius:3px;}
+  .arc b{font:600 .7rem/1.4 var(--mono);color:var(--ink);}
+  .arc span{font-size:.86rem;color:var(--muted);line-height:1.4;}
+
+  svg .lbl{font:600 10px var(--mono);fill:var(--ink);}
+  svg .lbl-s{font:500 8.5px var(--mono);fill:var(--muted);letter-spacing:.08em;}
+
+  blockquote{margin:0 0 1.3rem;padding:0 0 0 1.1rem;border-left:2px solid var(--accent);max-width:60ch;
+             font-size:1.02rem;color:var(--ink-soft);font-style:italic;}
+  blockquote cite{display:block;font:500 .7rem/1.6 var(--mono);font-style:normal;letter-spacing:.08em;
+                  text-transform:uppercase;color:var(--muted);margin-top:.4rem;}
+
+  .callout{background:var(--surface);border:1px solid var(--rule);border-radius:4px;padding:18px 20px;margin:0 0 1.4rem;
+           max-width:68ch;display:grid;gap:.5rem;}
+  .callout b{font:600 .7rem/1.5 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--accent-ink);}
+  .callout p{margin:0;font-size:.97rem;color:var(--ink-soft);}
+
+  footer{border-top:1px solid var(--rule);padding:36px 0 60px;font-size:.92rem;color:var(--muted);max-width:68ch;}
+
+  @media (max-width:900px){
+    .cols{grid-template-columns:minmax(0,1fr);gap:8px;padding-bottom:64px;}
+    nav.rail{position:static;max-height:none;padding:24px 0 0;}
+    body{font-size:16.5px;}
+  }
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important;}}
+</style>
+</head>
+<body>
+
+<div class="band">
+  <header class="shell masthead">
+    <p class="eyebrow">A working manual - poetics and narratology</p>
+    <h1>Sense &amp; <em>Structure</em></h1>
+    <p class="lede">Part one: how a poem means, once rhyme and metre are already handled. Part two: the whole
+      inherited vocabulary of narrative - every model, taxonomy and mechanism worth knowing by name.</p>
+    <p class="meta"><span>27 sections</span><span>~330 named concepts</span><span>Poetics / Narratology</span><span>Reference, not doctrine</span></p>
+  </header>
+</div>
+
+<div class="cols">
+<nav class="rail" aria-label="Contents">
+  <p class="part">I - Meaning in the poem</p>
+  <a href="#s1"><span>01</span>What meaning is</a>
+  <a href="#s2"><span>02</span>Image and the concrete</a>
+  <a href="#s3"><span>03</span>Figuration</a>
+  <a href="#s4"><span>04</span>Tension</a>
+  <a href="#s5"><span>05</span>Voice and address</a>
+  <a href="#s6"><span>06</span>How a poem moves</a>
+  <a href="#s7"><span>07</span>Diction</a>
+  <a href="#s8"><span>08</span>Line, syntax, sound</a>
+  <a href="#s9"><span>09</span>Depth layers</a>
+  <a href="#s10"><span>10</span>Failure modes</a>
+  <a href="#s11"><span>11</span>Revision and rubric</a>
+  <a href="#s12"><span>12</span>Schools and traditions</a>
+  <p class="part">II - Narrative concepts</p>
+  <a href="#s13"><span>13</span>Core distinctions</a>
+  <a href="#s14"><span>14</span>Structural models</a>
+  <a href="#s15"><span>15</span>Formalist toolkits</a>
+  <a href="#s16"><span>16</span>Genette: time and mood</a>
+  <a href="#s17"><span>17</span>Narrators</a>
+  <a href="#s18"><span>18</span>Character</a>
+  <a href="#s19"><span>19</span>Conflict and causality</a>
+  <a href="#s20"><span>20</span>Time, space, world</a>
+  <a href="#s21"><span>21</span>Tension mechanics</a>
+  <a href="#s22"><span>22</span>Theme layer</a>
+  <a href="#s23"><span>23</span>Reader-side theory</a>
+  <a href="#s24"><span>24</span>Post-classical schools</a>
+  <a href="#s25"><span>25</span>Workshop vocabulary</a>
+  <a href="#s26"><span>26</span>Narrative in the lyric</a>
+  <a href="#s27"><span>27</span>Sources</a>
+</nav>
+
+<main>
+
+<section id="s1">
+  <p class="num">Part I - 01</p>
+  <h2>What "meaning" means in a poem</h2>
+  <p class="wide">A poem does not carry a meaning the way a truck carries cargo. It performs one. The paraphrase
+    ("it is about grief") is not the poem's meaning but the residue left after the meaning has evaporated - what
+    Cleanth Brooks called the <span class="k">heresy of paraphrase</span>. The working test: if a prose sentence can
+    replace the poem without loss, the poem has no meaning of its own, only a subject.</p>
+  <blockquote>A poem should not mean / But be.<cite>Archibald MacLeish, Ars Poetica</cite></blockquote>
+  <h3>Foundational positions</h3>
+  <dl class="terms">
+    <div><dt>Heresy of paraphrase</dt><dd>Meaning is inseparable from the poem's structure of words; summary destroys it. The corollary for a writer: put the meaning in the <b>doing</b>, not in a statement placed inside the poem.</dd></div>
+    <div><dt>Enactment over assertion</dt><dd>The poem should make the reader undergo the experience, not receive a report of it. Assertion tells the conclusion; enactment reproduces the process that earns it.</dd></div>
+    <div><dt>Intentional fallacy (Wimsatt &amp; Beardsley)</dt><dd>What the poet meant to do is not evidence of what the poem does. Only what is on the page counts.</dd></div>
+    <div><dt>Affective fallacy</dt><dd>The reader's emotional reaction is not by itself proof of meaning either. Both fallacies push attention back onto the text's own machinery.</dd></div>
+    <div><dt>Negative capability (Keats)</dt><dd>The capacity to remain in uncertainty and doubt "without any irritable reaching after fact and reason". Meaning may stay unresolved and still be complete.</dd></div>
+    <div><dt>Discovery principle (Frost)</dt><dd>"No surprise for the writer, no surprise for the reader." A poem that only encodes what the poet already knew before writing tends to read as inert.</dd></div>
+    <div><dt>Dominant (Jakobson)</dt><dd>Every work has one component that governs and reshapes the rest. Knowing which element is dominant tells you what to protect in revision.</dd></div>
+    <div><dt>Poetic function (Jakobson)</dt><dd>Language turned toward the message itself: the pattern of the words is part of what is said, not packaging for it.</dd></div>
+  </dl>
+  <div class="callout">
+    <b>The four questions</b>
+    <p>Every finished poem answers them, explicitly or by implication: <b>Who speaks? To whom? Why now - what occasion
+      forced the utterance? Why in this form?</b> A poem that cannot answer "why now" usually reads as an exercise;
+      one that cannot answer "why in this form" is prose in disguise.</p>
+  </div>
+</section>
+
+<section id="s2">
+  <p class="num">02</p>
+  <h2>Image and the concrete</h2>
+  <p class="wide">Meaning in poetry is built out of particulars. Abstractions (love, time, soul, death) are cheques
+    drawn on an account the poem has not yet funded; images are the deposit. The rule of thumb: name a thing so
+    precisely that the emotion has nowhere to go but into the reader.</p>
+  <dl class="terms">
+    <div><dt>Objective correlative (Eliot)</dt><dd>A set of objects, a situation, a chain of events which will be the formula of a particular emotion: the emotion is produced by the facts given, never announced.</dd></div>
+    <div><dt>"No ideas but in things" (W.C. Williams)</dt><dd>Ideas enter the poem embodied in objects, or they do not enter at all.</dd></div>
+    <div><dt>Imagist rules (Pound, 1913)</dt><dd>Direct treatment of the "thing"; use absolutely no word that does not contribute to the presentation; compose in the sequence of the musical phrase, not of the metronome.</dd></div>
+    <div><dt>Concretion ladder</dt><dd>creature -> bird -> corvid -> the rook on the wet fence post. Meaning sharpens as you descend. Ascend deliberately, never by default.</dd></div>
+    <div><dt>Load-bearing vs decorative image</dt><dd>Test: delete the image. If only prettiness is lost, it was decorative. A load-bearing image changes what the poem knows.</dd></div>
+    <div><dt>Sensory spread</dt><dd>Sight dominates by habit. Smell, taste, texture, temperature, proprioception and sound carry emotion with less resistance because they are less mediated by cliche.</dd></div>
+    <div><dt>Resonant detail</dt><dd>A specific that implies a whole world (a chipped enamel mug implies a kitchen, a decade, a class). Selected, not exhaustive - description is not accumulation.</dd></div>
+    <div><dt>Through-image / controlling image</dt><dd>One image developed across the poem, giving structural spine; its transformation is the plot of a lyric.</dd></div>
+    <div><dt>Image cluster</dt><dd>Recurring related images across a poem or body of work (Shakespeare's disease imagery in Hamlet); meaning accumulates by repetition with variation.</dd></div>
+    <div><dt>Show and tell</dt><dd>"Show, don't tell" is a bias, not a law. Telling is the fastest instrument in poetry - it just has to be earned by showing first. Great poems alternate.</dd></div>
+    <div><dt>Deixis</dt><dd>this, here, now, you. Deictic words assert presence and pull the reader into the poem's coordinate system.</dd></div>
+    <div><dt>Verbal object / acmeist "veshchnost" <span class="ru">(вещность)</span></dt><dd>The word treated as a solid object with weight and edges rather than a pointer to a mood - the Russian counter-programme to symbolist vagueness.</dd></div>
+  </dl>
+</section>
+
+<section id="s3">
+  <p class="num">03</p>
+  <h2>Figuration: the metaphor machinery</h2>
+  <p class="wide">A figure is not ornament. It is a claim that two unlike things share a structure - the claim is the
+    meaning. A good metaphor is <b>true in a way the literal statement is not</b>, and its vehicle keeps paying out
+    after the first reading.</p>
+  <h3>Anatomy</h3>
+  <dl class="terms">
+    <div><dt>Tenor / vehicle / ground (I.A. Richards)</dt><dd>Tenor = the subject; vehicle = the image applied to it; ground = the shared property that licenses the transfer. Weak metaphors have a thin or accidental ground.</dd></div>
+    <div><dt>Tension / distance</dt><dd>The further apart tenor and vehicle, the higher the voltage and the higher the risk of incoherence. Reverdy's rule: the image is stronger the more distant and <b>just</b> the relation of the two realities.</dd></div>
+    <div><dt>Conceptual metaphor (Lakoff &amp; Johnson)</dt><dd>Whole systems of thought mapped from a source domain onto a target: ARGUMENT IS WAR, TIME IS MONEY, LIFE IS A JOURNEY. Poems can exploit, invert, or literalize a dead conceptual metaphor.</dd></div>
+    <div><dt>Metaphor vs metonymy (Jakobson)</dt><dd>Two axes of language: metaphor works by similarity/substitution (poetry's default pole), metonymy by contiguity/association (prose realism's pole). Deliberately switching poles restructures a poem's whole logic.</dd></div>
+    <div><dt>Synecdoche</dt><dd>Part for whole (sails for ships). Compresses and often focalizes attention on the body or fragment.</dd></div>
+    <div><dt>Simile</dt><dd>Explicit comparison. Buys clarity and control, pays in immediacy - "like" holds the two terms apart. Epic simile extends the vehicle until it becomes its own scene.</dd></div>
+    <div><dt>Symbol</dt><dd>An image whose meaning exceeds any single equivalent and stays partly unresolvable. If it decodes to one word, it is an allegorical counter, not a symbol.</dd></div>
+    <div><dt>Allegory</dt><dd>Sustained one-to-one correspondence between narrative surface and a second system of meaning; total control, low ambiguity.</dd></div>
+    <div><dt>Conceit</dt><dd>An extended, intellectually elaborate metaphor pushed past comfort (Donne's compasses). Its pleasure is the strain of the fit.</dd></div>
+    <div><dt>Personification / prosopopoeia</dt><dd>Human agency granted to the non-human; suspect when reflexive, powerful when it forces a real ethical claim.</dd></div>
+    <div><dt>Apostrophe</dt><dd>Direct address to the absent, dead, abstract or inanimate. The founding gesture of lyric intensity - and its most exposed one.</dd></div>
+    <div><dt>Catachresis</dt><dd>Deliberate misapplication of a word where no proper term exists ("the leg of the table", "a grief of light"). Generates meaning by strain.</dd></div>
+    <div><dt>Zeugma / syllepsis</dt><dd>One verb governing two objects in different registers ("she took her coat and her leave"): comedy, irony, sudden double-level meaning.</dd></div>
+    <div><dt>Oxymoron / paradox</dt><dd>Contradiction held in one phrase or one proposition; the compressed form of the poem's central tension.</dd></div>
+    <div><dt>Hypallage (transferred epithet)</dt><dd>An adjective attached to the wrong noun ("the sleepless night"), relocating feeling from person to world.</dd></div>
+    <div><dt>Literalization</dt><dd>Taking a dead metaphor at its word and following it into its own world ("falling in love" -> the physics of the fall). One of the most reliable engines of surprise.</dd></div>
+  </dl>
+  <h3>Failure states of figures</h3>
+  <ul class="plain">
+    <li><b>Dead metaphor:</b> the vehicle no longer projects an image (leg of a journey). Neutral in prose, invisible in poetry - either revive or replace.</li>
+    <li><b>Mixed metaphor:</b> incompatible vehicles collide and expose the mechanism (unless the collision is the point).</li>
+    <li><b>Vehicle drift:</b> the image becomes so interesting the tenor is abandoned; the poem stops being about anything.</li>
+    <li><b>Decorative simile:</b> comparison that adds an adjective's worth of information at a line's worth of cost.</li>
+    <li><b>Stacking:</b> three metaphors for one thing signals that none of them is right.</li>
+  </ul>
+</section>
+
+<section id="s4">
+  <p class="num">04</p>
+  <h2>Tension: paradox, irony, ambiguity</h2>
+  <p class="wide">Meaning is generated by resistance. A poem in which everything agrees with everything else has
+    nothing to discover. The classic New Critical claim: the language of poetry is the language of paradox, and the
+    poem's unity is a <b>reconciliation of opposites</b>, not an absence of them.</p>
+  <dl class="terms">
+    <div><dt>Tension (Allen Tate)</dt><dd>Coined from ex<b>tension</b> (literal, denotative reach) + in<b>tension</b> (connotative, figurative reach). A good poem holds both meanings at full stretch simultaneously.</dd></div>
+    <div><dt>Paradox (Brooks)</dt><dd>A statement that is contradictory on the surface and true underneath; forces the reader to construct the frame in which it holds.</dd></div>
+    <div><dt>Verbal irony</dt><dd>Said and meant diverge; the gap is the meaning. Stable irony resolves into a definite second meaning; unstable irony refuses to.</dd></div>
+    <div><dt>Situational irony</dt><dd>Outcome contradicts expectation set by the poem's own frame.</dd></div>
+    <div><dt>Dramatic irony</dt><dd>Reader knows what the speaker does not - the engine of the dramatic monologue, where the speaker indicts himself.</dd></div>
+    <div><dt>Romantic irony</dt><dd>The work acknowledges its own artifice mid-flight without collapsing.</dd></div>
+    <div><dt>Empson's seven types of ambiguity</dt><dd>(1) detail effective several ways at once; (2) two meanings resolved into one; (3) two ideas via one word (pun); (4) alternative meanings combining an unclear state of mind; (5) a simile mid-shift, the author discovering while writing; (6) a statement saying nothing, forcing the reader to invent; (7) full contradiction marking a division in the author's mind.</dd></div>
+    <div><dt>Volta / turn</dt><dd>The hinge where the poem changes direction, scale or knowledge. Petrarchan sonnet: line 9. English sonnet: the couplet. Free verse: wherever the poem stops asserting and starts revising itself. <b>A lyric without a turn is usually a description.</b></dd></div>
+    <div><dt>Kire <span class="ru">(切れ, cutting)</span></dt><dd>Japanese equivalent: the caesura between two images whose collision the reader must complete. The cut is the meaning.</dd></div>
+    <div><dt>Counter-statement</dt><dd>Deliberately admitting the strongest objection to the poem's own feeling; the fastest cure for sentimentality.</dd></div>
+    <div><dt>Litotes / understatement</dt><dd>Saying less to mean more; pressure applied by restraint.</dd></div>
+    <div><dt>Hyperbole</dt><dd>Saying more, knowingly; comic, sublime, or diagnostic of the speaker.</dd></div>
+    <div><dt>Argument with oneself (Yeats)</dt><dd>"Out of our quarrel with others we make rhetoric; out of the quarrel with ourselves, poetry."</dd></div>
+  </dl>
+</section>
+
+<section id="s5">
+  <p class="num">05</p>
+  <h2>Voice, speaker, address</h2>
+  <p class="wide">The speaker is a construction, even when autobiographical. Deciding stance, distance and audience
+    settles most local questions of diction before they arise.</p>
+  <dl class="terms">
+    <div><dt>Speaker vs poet</dt><dd>The "I" of a poem is a persona with a position, a limited knowledge and an interest. Treating it as a character makes irony and self-indictment available.</dd></div>
+    <div><dt>Persona / mask</dt><dd>An explicitly assumed voice (Browning's dramatic monologues; Pessoa's heteronyms; Yeats's anti-self). Grants access to material the poet's own voice cannot reach.</dd></div>
+    <div><dt>Dramatic monologue</dt><dd>A single speaker, an implied silent listener, an occasion, and self-revelation exceeding the speaker's intent.</dd></div>
+    <div><dt>Stance and distance</dt><dd>How close the speaker stands to the event (immersed / recollecting / analysing) and how much they concede they know.</dd></div>
+    <div><dt>Address</dt><dd>Who receives the poem: the reader, a beloved, the dead, a god, an object, the self, no one. Address determines tone more powerfully than subject does.</dd></div>
+    <div><dt>The second-person problem</dt><dd>"You" can be a specific person, a generalized reader, or the disguised self. Unmarked drift between the three reads as evasion.</dd></div>
+    <div><dt>Register</dt><dd>The social level of the vocabulary (high/formal, plain, demotic, technical). Mixing registers is one of the strongest and cheapest tonal devices.</dd></div>
+    <div><dt>Decorum</dt><dd>Classical fit of style to subject and speaker. Modern practice mostly works by breaking it on purpose - which requires knowing where it sits.</dd></div>
+    <div><dt>Tone vs mood</dt><dd>Tone = the speaker's attitude to the material; mood = the atmosphere produced in the reader. They can and often should diverge.</dd></div>
+    <div><dt>Sincerity vs authenticity</dt><dd>Sincerity is a claim about the poet's feeling; authenticity is a property of the poem's texture. Only the second is verifiable on the page.</dd></div>
+    <div><dt>Earned emotion</dt><dd>Emotion proportional to what the poem has actually established. Sentimentality = emotional claim exceeding its evidence.</dd></div>
+    <div><dt>Confessional risk</dt><dd>Biographical material supplies charge but not structure. The test is whether the poem works for a reader who does not know the poet.</dd></div>
+  </dl>
+</section>
+
+<section id="s6">
+  <p class="num">06</p>
+  <h2>How a poem moves: shapes of thought</h2>
+  <p class="wide">Under the stanzas there is a logic of development. Choosing one consciously is the single largest
+    structural decision after the line.</p>
+  <h3>Modes of development</h3>
+  <dl class="terms">
+    <div><dt>Argumentative</dt><dd>Proposition -> complication -> turn -> resolution. The sonnet's native logic; also most epigrams.</dd></div>
+    <div><dt>Narrative</dt><dd>Event sequence with consequence. See Part II - a lyric can borrow any of it in miniature.</dd></div>
+    <div><dt>Meditative / greater Romantic lyric (Abrams)</dt><dd>A described scene -> inward meditation triggered by it -> return to the scene, changed. Still the most common shape in contemporary lyric.</dd></div>
+    <div><dt>Associative / leaping (Bly)</dt><dd>Progression by imaginative jump rather than logic; coherence is emotional and imagistic. Requires a strong sensory floor or it reads as noise.</dd></div>
+    <div><dt>Catalogue / anaphoric</dt><dd>Accumulation by repetition and list (Whitman, Smart, litany). Meaning arrives through pattern pressure and the break in the pattern.</dd></div>
+    <div><dt>Juxtapositional / ideogrammic (Pound)</dt><dd>Set two particulars side by side, let the reader generate the third term. Montage logic (cf. Eisenstein).</dd></div>
+    <div><dt>Dialectical</dt><dd>Thesis / antithesis held without synthesis, or synthesized in the final image.</dd></div>
+    <div><dt>Interrogative</dt><dd>Driven by a question the poem cannot answer; closure comes from refining the question.</dd></div>
+    <div><dt>Kishotenketsu</dt><dd>Four movements without conflict: setup, development, an unexpected element that recontextualizes, reconciliation. See §14.</dd></div>
+  </dl>
+  <h3>Openings, middles, endings</h3>
+  <dl class="terms">
+    <div><dt>The first line's contract</dt><dd>It sets the pitch, the speed and the level of reality. Most drafts begin one to three lines before the real poem starts.</dd></div>
+    <div><dt>Title as working part</dt><dd>The title can supply the occasion, the frame, the irony or the missing term - it is a line you do not have to pay for inside the poem.</dd></div>
+    <div><dt>Escalation and deepening</dt><dd>The middle must raise the stakes or the accuracy. Repetition without increase is stall.</dd></div>
+    <div><dt>Closure (Barbara Herrnstein Smith)</dt><dd>The sense of finality is produced by structural signals (formal completion, terminal modification, repetition, return, epigram) - not by resolving the subject.</dd></div>
+    <div><dt>Resolution vs resonance</dt><dd>Resolution answers; resonance keeps ringing. Contemporary practice favours the second, but an unresolved poem still needs a <b>completed gesture</b>.</dd></div>
+    <div><dt>The last-line traps</dt><dd>Moralizing, restating the title, explaining the metaphor, reaching for the cosmic. Standard fix: delete the final one to three lines and check whether the poem got better.</dd></div>
+    <div><dt>Return with difference</dt><dd>End where you began with the meaning changed - the cheapest reliable closure in existence, and still effective.</dd></div>
+    <div><dt>Undercut</dt><dd>Deflating the ending on purpose so the emotion escapes rather than resolves.</dd></div>
+  </dl>
+</section>
+
+<section id="s7">
+  <p class="num">07</p>
+  <h2>Diction: meaning at word level</h2>
+  <dl class="terms">
+    <div><dt>Denotation / connotation</dt><dd>Dictionary sense vs the freight of association. Poems are mostly built in the second layer.</dd></div>
+    <div><dt>The verb is the engine</dt><dd>Meaning-per-syllable is highest in verbs. Weak drafts are recognisable by copulas plus adjectives ("was beautiful") where a verb could act.</dd></div>
+    <div><dt>Adjective inflation</dt><dd>Each adjective borrows credibility from its noun. Two per noun usually means the noun is wrong.</dd></div>
+    <div><dt>Abstraction budget</dt><dd>Words like soul, love, eternity, darkness, dream cost more than they pay unless the poem has already funded them with particulars.</dd></div>
+    <div><dt>Etymological register</dt><dd>English: Germanic (short, bodily, blunt) vs Latinate (abstract, formal, distancing). Russian: <span class="ru">исконная лексика</span> vs <span class="ru">церковнославянизмы</span> vs <span class="ru">заимствования</span> - the high/low axis is if anything sharper.</dd></div>
+    <div><dt>Mot juste</dt><dd>The single exact word rather than an approximation plus a modifier.</dd></div>
+    <div><dt>Collocation-breaking</dt><dd>Deliberately violating habitual word pairings; the primary local source of freshness.</dd></div>
+    <div><dt>Cliche detection</dt><dd>If a reader can finish the phrase, the phrase is transmitting nothing. Test each string of 3+ words for predictability.</dd></div>
+    <div><dt>Defamiliarization <span class="ru">(остранение, Шкловский)</span></dt><dd>Making the familiar strange so perception is slowed and the object is <b>seen</b> rather than recognised. Shklovsky's core claim: art exists to recover the sensation of life, and difficulty of form is the instrument.</dd></div>
+    <div><dt>Archaism, neologism, dialect, jargon</dt><dd>Each imports a whole social world with one word. Technical lexicons (medical, nautical, legal, machine) are underused sources of precision.</dd></div>
+    <div><dt>Proper nouns</dt><dd>Names carry unearned specificity - the fastest way to make a poem look at something real.</dd></div>
+    <div><dt>Repetition as accrual</dt><dd>A word repeated changes meaning each time by context; refrains are meaning-machines, not decoration.</dd></div>
+    <div><dt>Tightness of the verse series <span class="ru">(теснота стихового ряда, Тынянов)</span></dt><dd>In verse, words are packed so densely that each one deforms the meaning of its neighbours - a word in a line does not mean what it means in a sentence. The theoretical basis for why line placement is a semantic act.</dd></div>
+  </dl>
+</section>
+
+<section id="s8">
+  <p class="num">08</p>
+  <h2>Line, syntax and sound as carriers of meaning</h2>
+  <p class="wide">Excluding rhyme entirely, form still means. The line is the unit of attention; syntax is the shape
+    of thinking; sound is the body of the argument.</p>
+  <h3>The line</h3>
+  <dl class="terms">
+    <div><dt>Line as unit of attention</dt><dd>Each break tells the reader where to pause and what to hold. In free verse the line break <b>is</b> the metre.</dd></div>
+    <div><dt>Enjambment</dt><dd>Sense runs past the break: creates suspension, a false first reading, then retroactive revision. The double reading is free meaning - use it on the words that can bear two senses.</dd></div>
+    <div><dt>End-stopping</dt><dd>Syntax and line coincide: assertion, finality, ceremony. A run of end-stopped lines after enjambment lands like a verdict.</dd></div>
+    <div><dt>Caesura</dt><dd>Internal pause; splits a line into opposed halves, or lets silence carry an unsaid clause.</dd></div>
+    <div><dt>Stanza as room</dt><dd><i>Stanza</i> is Italian for "room": each is a self-contained space with an entrance and an exit. Stanza breaks are the poem's paragraphing and its largest silences.</dd></div>
+    <div><dt>White space / composition by field (Olson)</dt><dd>The page as a scored surface; spacing notates breath, hesitation and simultaneity.</dd></div>
+    <div><dt>Prosody as meaning</dt><dd>Metrical substitution marks emphasis: a trochee at a line's head jolts; a spondee weights; a pyrrhic accelerates. <span class="ru">В русском стихе: пиррихий, спондей, ритмические перебои</span> - a rhythm break is a semantic signal.</dd></div>
+  </dl>
+  <h3>Syntax</h3>
+  <dl class="terms">
+    <div><dt>Parataxis</dt><dd>Clauses set side by side without subordination ("and... and..."). Democratic, biblical, fast, non-hierarchical.</dd></div>
+    <div><dt>Hypotaxis</dt><dd>Subordination and dependency. Encodes causation, qualification, a mind that argues with itself.</dd></div>
+    <div><dt>Periodic vs loose sentence</dt><dd>Periodic suspends the main clause to the end (tension, arrival); loose delivers it first (ease, accumulation).</dd></div>
+    <div><dt>Fragment</dt><dd>Grammatical incompleteness as shock, breathlessness, or perception-before-cognition.</dd></div>
+    <div><dt>Anaphora / epistrophe / anadiplosis / chiasmus</dt><dd>Repetition at the head / at the tail / linking end to next head / mirrored order (ABBA). Each imposes a different shape on thought.</dd></div>
+    <div><dt>Asyndeton / polysyndeton</dt><dd>Omitting or multiplying conjunctions: speed and severity vs ritual and endlessness.</dd></div>
+    <div><dt>Inversion / hyperbaton</dt><dd>Displaced word order for emphasis or metre; in contemporary verse it must be motivated or it reads as costume.</dd></div>
+    <div><dt>Sentence-length architecture</dt><dd>Alternating long accumulating sentences with a three-word one is the strongest rhythmic instrument in free verse.</dd></div>
+  </dl>
+  <h3>Sound (setting rhyme aside)</h3>
+  <dl class="terms">
+    <div><dt>Assonance / consonance / alliteration</dt><dd>Repeated vowels / consonants / initial sounds - binding words into semantic relation that the argument never states.</dd></div>
+    <div><dt>Euphony vs cacophony</dt><dd>Smooth liquids and open vowels vs stops and clusters. Texture should confirm or deliberately contradict the sense.</dd></div>
+    <div><dt>Sound symbolism / phonaesthesia</dt><dd>High front vowels read small and quick, low back vowels large and slow; clusters read effortful. Weak as a rule, effective as a tendency.</dd></div>
+    <div><dt>"The sound must seem an echo to the sense" (Pope)</dt><dd>Rate, weight and difficulty of pronunciation as mimetic devices.</dd></div>
+    <div><dt>Silence</dt><dd>Stanza break, caesura, ellipsis and the space after the last line are part of the composition. What is not said is a positive value, not an omission.</dd></div>
+  </dl>
+</section>
+
+<section id="s9">
+  <p class="num">09</p>
+  <h2>Depth layers: subtext, allusion, myth</h2>
+  <dl class="terms">
+    <div><dt>Subtext</dt><dd>What the poem is doing while saying something else. Produced by pressure between surface statement and image, tone, or omission.</dd></div>
+    <div><dt>Allusion</dt><dd>A borrowed frame: one word imports another text's whole situation. Cost: the reader must have it. Benefit: instant depth and a second speaker.</dd></div>
+    <div><dt>Intertextuality (Kristeva)</dt><dd>Every text is a mosaic of other texts; meaning is partly produced by the network, not by the individual poem.</dd></div>
+    <div><dt>Anxiety of influence (Bloom)</dt><dd>Strong poems misread their precursors on purpose - swerve, completion, emptying-out, return. Useful as a generative strategy, not only as criticism.</dd></div>
+    <div><dt>Archetype (Jung) / archetypal criticism (Frye)</dt><dd>Recurrent figures and patterns (descent, rebirth, the double, the threshold). Frye maps modes onto seasons: comedy/spring, romance/summer, tragedy/autumn, irony/winter.</dd></div>
+    <div><dt>Mythic method (Eliot)</dt><dd>Using a myth as a continuous parallel to contemporary material, giving shape to what would otherwise be anarchy.</dd></div>
+    <div><dt>Barthes' orders of signification</dt><dd>Denotation -> connotation -> myth: how an image becomes naturalized ideology. Poems can expose that machinery or exploit it.</dd></div>
+    <div><dt>Gaps / the reader's share (Iser)</dt><dd>Indeterminacies the reader must fill; too few and the poem is a lecture, too many and it is a private note.</dd></div>
+    <div><dt>Palimpsest</dt><dd>The earlier text visible under the current one; erasure and cento poetics make this literal.</dd></div>
+    <div><dt>Multiple simultaneous readings</dt><dd>Designed polysemy - the poem is engineered so that two coherent readings persist rather than one winning.</dd></div>
+  </dl>
+</section>
+
+<section id="s10">
+  <p class="num">10</p>
+  <h2>Failure modes and their fixes</h2>
+  <p class="wide">Most weak poems fail in a small number of identifiable ways. Diagnose by symptom.</p>
+  <div class="scroll">
+  <table>
+    <thead><tr><th>Symptom</th><th>Underlying cause</th><th>Repair</th></tr></thead>
+    <tbody>
+      <tr><td class="wrapc">Named emotion</td><td>"My heart aches with longing" - stating the feeling instead of causing it.</td><td>Delete the emotion word; supply the occasion and the object that produced it.</td></tr>
+      <tr><td class="wrapc">Sentimentality</td><td>Emotional claim exceeds the evidence the poem has laid down.</td><td>Add resistance: a counter-statement, an ugly detail, a limit on what the speaker knows.</td></tr>
+      <tr><td class="wrapc">Decorative image</td><td>Image adds beauty but no knowledge.</td><td>Delete; or make it change the poem's understanding of its subject.</td></tr>
+      <tr><td class="wrapc">Explanatory ending</td><td>Distrust of the reader; the poem glosses itself.</td><td>Cut the last 1-3 lines. Usually the poem ends earlier than the draft says.</td></tr>
+      <tr><td class="wrapc">Slow start</td><td>Throat-clearing: the poem describes its way toward its subject.</td><td>Cut the first stanza; check whether line 4 or 7 is the true opening.</td></tr>
+      <tr><td class="wrapc">Cliche</td><td>Prefabricated phrases substituting for perception.</td><td>Break the collocation; re-see the object; replace the phrase with the thing itself.</td></tr>
+      <tr><td class="wrapc">Inert syntax</td><td>Chains of "is/was + adjective"; nothing acts.</td><td>Rewrite with transitive verbs; give agency to the objects.</td></tr>
+      <tr><td class="wrapc">Arbitrary lineation</td><td>Prose broken at random; the line does no work.</td><td>Re-set as prose, then re-break for suspension, double reading, rhythm.</td></tr>
+      <tr><td class="wrapc">No turn</td><td>The poem ends knowing exactly what it knew at line 1.</td><td>Introduce a complication or reversal at ~60-70%; let the poem discover something.</td></tr>
+      <tr><td class="wrapc">Voice drift</td><td>Register wanders (colloquial to archaic) with no motivation.</td><td>Fix the speaker's stance and audience, then re-tune each line to it.</td></tr>
+      <tr><td class="wrapc">False profundity</td><td>Abstraction and portentous rhythm simulating depth.</td><td>Demand a referent for every abstract noun; if none exists, cut.</td></tr>
+      <tr><td class="wrapc">Thesis poem</td><td>An argument illustrated rather than enacted.</td><td>Remove the conclusion; keep only the material that would force a reader to reach it.</td></tr>
+      <tr><td class="wrapc">Competent nullity</td><td>The "workshop poem" - well made, unnecessary, risk-free.</td><td>Identify what is actually at stake; push toward the material being avoided.</td></tr>
+      <tr><td class="wrapc">Unearned "we"</td><td>Speaking for a collective the poem has not established.</td><td>Return to "I" or name the group and its claim.</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<section id="s11">
+  <p class="num">11</p>
+  <h2>Revision protocol and a meaning rubric</h2>
+  <p class="wide">The passes below are ordered because each one changes the material the next one works on.</p>
+  <ol class="steps">
+    <li><b>Read aloud, whole.</b> Mark every place breath or attention fails.</li>
+    <li><b>Occasion check.</b> Answer the four questions of §1 in one sentence each. Any unanswerable one is the poem's real problem.</li>
+    <li><b>Head and tail surgery.</b> Try cutting the first stanza and the last 1-3 lines. Keep the cut if the poem sharpens.</li>
+    <li><b>Image audit.</b> For each image: what does the poem know after it that it did not know before? No answer -> cut or reload.</li>
+    <li><b>Verb pass.</b> Replace copulas with acting verbs. Count adjectives; halve them.</li>
+    <li><b>Abstraction count.</b> Circle abstract nouns; each must be paid for by a preceding particular.</li>
+    <li><b>Turn location.</b> Mark the volta. If there is none, build one or admit the poem is a description and make it a great one.</li>
+    <li><b>Stakes.</b> Name what is risked, lost or exposed. If nothing, the poem is decorative by construction.</li>
+    <li><b>Line-break test.</b> Re-set as prose; re-break from scratch; compare against the original.</li>
+    <li><b>Sound pass.</b> Read for texture only - vowel runs, clusters, tempo, silences.</li>
+    <li><b>Stranger test.</b> Does it work for a reader with no access to the poet's biography or intentions?</li>
+    <li><b>Cool-off and retype.</b> Leave it days; retype the whole poem from scratch rather than editing the file. What you cannot remember was usually not load-bearing.</li>
+  </ol>
+  <h3>Rubric - scoring meaning (usable for automated evaluation)</h3>
+  <div class="scroll">
+  <table>
+    <thead><tr><th>Criterion</th><th>Question</th><th>Weak signal</th><th>Strong signal</th></tr></thead>
+    <tbody>
+      <tr><td>Occasion</td><td>Why is this being said now?</td><td>No triggering event or pressure</td><td>Specific, dated, situated utterance</td></tr>
+      <tr><td>Stakes</td><td>What is risked?</td><td>Nothing can be lost</td><td>Loss, exposure or cost is legible</td></tr>
+      <tr><td>Concretion</td><td>Particulars per abstraction</td><td>Abstract nouns dominate</td><td>Named, sensory, specific objects</td></tr>
+      <tr><td>Figuration</td><td>Do figures do semantic work?</td><td>Ornament, cliche, dead metaphor</td><td>Figures that are true non-literally</td></tr>
+      <tr><td>Tension</td><td>Is there a real counterforce?</td><td>Everything agrees</td><td>Paradox, irony, unresolved pull</td></tr>
+      <tr><td>Turn</td><td>Does knowledge change?</td><td>Ends where it began</td><td>Discovery placed and prepared</td></tr>
+      <tr><td>Voice</td><td>Is the stance stable and motivated?</td><td>Register drift, generic voice</td><td>Consistent, characterized, addressed</td></tr>
+      <tr><td>Form fit</td><td>Why this shape?</td><td>Lineation arbitrary</td><td>Breaks and stanzas carry meaning</td></tr>
+      <tr><td>Closure</td><td>Is the gesture complete?</td><td>Stops, or over-explains</td><td>Completed and still resonating</td></tr>
+      <tr><td>Surprise</td><td>Anything unpredictable?</td><td>Fully predictable at every step</td><td>Local unpredictability, retrospective rightness</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<section id="s12">
+  <p class="num">12</p>
+  <h2>Schools and traditions, compressed</h2>
+  <p class="wide">Each school is a theory about where meaning lives. Knowing the menu is faster than reinventing one position at a time.</p>
+  <h3>Western lineage</h3>
+  <dl class="terms">
+    <div><dt>Aristotle / Horace / Longinus</dt><dd>Mimesis and structure; instruct-and-delight; the sublime as transport that overwhelms judgement.</dd></div>
+    <div><dt>Romantic</dt><dd>Wordsworth: "spontaneous overflow of powerful feelings recollected in tranquillity"; Coleridge: imagination (unifying, esemplastic) vs fancy (mere assembly).</dd></div>
+    <div><dt>Symbolism</dt><dd>Suggestion over statement; correspondences between sense-worlds; Mallarme: paint not the thing but the effect it produces.</dd></div>
+    <div><dt>Imagism / Objectivism</dt><dd>Precision, compression, the thing itself; sincerity and objectification (Zukofsky).</dd></div>
+    <div><dt>Modernist impersonality</dt><dd>Eliot: poetry is an escape from emotion and personality; the poet is a catalyst, tradition an active pressure.</dd></div>
+    <div><dt>Surrealism</dt><dd>Image as spark between two distant realities; automatism; the unconscious as compositional method.</dd></div>
+    <div><dt>Deep image / confessional / New York School</dt><dd>Archetypal descent; biography under pressure; urban, offhand, present-tense speech.</dd></div>
+    <div><dt>Language writing</dt><dd>Meaning produced by the reader; syntax disrupted to expose ideology in ordinary usage.</dd></div>
+    <div><dt>Conceptual / documentary</dt><dd>The frame and the procedure carry the meaning; found text, constraint, archive (see also Oulipo: constraint as generator).</dd></div>
+  </dl>
+  <h3>Russian line <span class="ru">(directly relevant to Russian-language generation)</span></h3>
+  <dl class="terms">
+    <div><dt>Символизм</dt><dd>Music, suggestion, the other world behind appearances (Блок, Белый). Risk: vagueness as a house style.</dd></div>
+    <div><dt>Акмеизм</dt><dd>Против символистской туманности: <span class="ru">вещность</span>, clarity, craft, world-culture memory (Мандельштам, Ахматова, Гумилёв).</dd></div>
+    <div><dt>Футуризм / заумь</dt><dd>The word as autonomous material; sound before reference (Хлебников, Крученых).</dd></div>
+    <div><dt>ОПОЯЗ / формализм</dt><dd>Шкловский: <span class="ru">остранение</span>, form as device; Тынянов: <span class="ru">теснота стихового ряда</span>; Эйхенбаум: melodics of verse.</dd></div>
+    <div><dt>Бахтин</dt><dd>Polyphony, dialogism, the word as always already someone else's, <span class="ru">хронотоп</span> (see §20).</dd></div>
+    <div><dt>Лотман</dt><dd>The poetic text as a system where every level (phonetic, grammatical, semantic) generates meaning through structural opposition.</dd></div>
+    <div><dt>Бродский</dt><dd>Language as the subject and the agent; poem as an acceleration of consciousness; metre as memory.</dd></div>
+  </dl>
+  <h3>Non-Western frameworks</h3>
+  <dl class="terms">
+    <div><dt>Japanese</dt><dd><span class="k">kigo</span> (season word), <span class="k">kireji</span> (cutting word), <span class="k">mono no aware</span> (the pathos of transience), <span class="k">yugen</span> (profound suggestion), <span class="k">wabi-sabi</span>; renga linking as a narrative logic without plot.</dd></div>
+    <div><dt>Sanskrit</dt><dd><span class="k">rasa</span> theory (nine aesthetic flavours evoked in the audience), <span class="k">dhvani</span> (suggested meaning as the soul of poetry), <span class="k">alankara</span> (figures).</dd></div>
+    <div><dt>Classical Chinese</dt><dd>Parallelism as structural argument; allusive compression; <span class="k">qing-jing jiaorong</span> - fusion of feeling and scene.</dd></div>
+    <div><dt>Persian / Arabic</dt><dd>Ghazal: autonomous couplets, <span class="k">radif</span> refrain, <span class="k">takhallus</span> signature; deliberate undecidability between erotic and divine address.</dd></div>
+  </dl>
+</section>
+
+<section id="s13">
+  <p class="num">Part II - 13</p>
+  <h2>Core distinctions of narrative</h2>
+  <p class="wide">Narratology's first move is to separate <b>what happened</b> from <b>how it is told</b>. Almost every
+    other concept is a refinement of that split.</p>
+  <dl class="terms">
+    <div><dt>Fabula / syuzhet <span class="ru">(фабула / сюжет)</span></dt><dd>Russian Formalist pair. Fabula = the events in chronological, causal order, reconstructed by the reader. Syuzhet = the arrangement actually presented, with its order, gaps and emphases. All plotting is the deformation of fabula into syuzhet.</dd></div>
+    <div><dt>Story / discourse (Chatman)</dt><dd>The Anglo-American restatement: story = content plane (events, characters, setting); discourse = expression plane (the telling).</dd></div>
+    <div><dt>Histoire / recit / narration (Genette)</dt><dd>Three-way split: the events; the text that narrates them; the act of narrating itself. Distinguishing the third makes narrators and framing analysable.</dd></div>
+    <div><dt>Story vs plot (Forster)</dt><dd>"The king died and then the queen died" is story. "The king died and then the queen died of grief" is plot - causality added.</dd></div>
+    <div><dt>Diegesis vs mimesis</dt><dd>Telling vs showing; summary vs scene. Plato's distinction, still the basic control on narrative distance.</dd></div>
+    <div><dt>Narrativity</dt><dd>The degree to which a text reads as a narrative at all - a scale, not a binary.</dd></div>
+    <div><dt>Eventfulness (Schmid)</dt><dd>An event counts as narrative when a change is real, resultative, unpredictable and consequential. Low eventfulness = things happen but nothing changes.</dd></div>
+    <div><dt>Tellability</dt><dd>Why this story is worth telling at all - the breach of the expected that licenses the telling (Labov's "so what" test).</dd></div>
+    <div><dt>Narrative situation (Stanzel)</dt><dd>Three typical configurations: authorial (external narrator), figural (through a character's consciousness), first-person.</dd></div>
+    <div><dt>Storyworld (Herman)</dt><dd>The mental model of world, agents and states a reader builds and updates; narrative comprehension is world-construction, not sentence-decoding.</dd></div>
+    <div><dt>Narrative transaction</dt><dd>Real author -> implied author -> narrator -> narratee -> implied reader -> real reader. Six positions, each of which can be manipulated separately.</dd></div>
+  </dl>
+</section>
+
+<section id="s14">
+  <p class="num">14</p>
+  <h2>Structural models of plot</h2>
+  <p class="wide">Every model below is a compression of the same intuition - stability, disturbance, escalation,
+    reversal, new stability - cut at different joints. Laid on one axis, their disagreements are visible.</p>
+
+  <figure>
+    <div class="scroll">
+      <div class="ruler"><span></span><div><span>0%</span><span>25</span><span>50</span><span>75</span><span>100%</span></div></div>
+      <div class="atlas">
+        <div class="arow"><b>Aristotle</b><div class="track" style="grid-template-columns:50fr 12fr 38fr">
+          <div class="seg" title="Desis - the tying / complication">Desis - complication</div>
+          <div class="seg t4" title="Peripeteia and anagnorisis">Peripeteia</div>
+          <div class="seg t2" title="Lysis - the untying">Lysis - unravelling</div></div></div>
+        <div class="arow"><b>Freytag</b><div class="track" style="grid-template-columns:15fr 35fr 8fr 27fr 15fr">
+          <div class="seg">Exposition</div><div class="seg t2">Rising action</div>
+          <div class="seg t4">Climax</div><div class="seg t2">Falling action</div>
+          <div class="seg">Catastrophe</div></div></div>
+        <div class="arow"><b>Three-act</b><div class="track" style="grid-template-columns:25fr 50fr 25fr">
+          <div class="seg">I - Setup</div><div class="seg t2">II - Confrontation</div>
+          <div class="seg t3">III - Resolution</div></div></div>
+        <div class="arow"><b>Todorov</b><div class="track" style="grid-template-columns:18fr 14fr 18fr 34fr 16fr">
+          <div class="seg">Equilibrium</div><div class="seg t3">Disruption</div>
+          <div class="seg t2">Recognition</div><div class="seg t2">Repair attempt</div>
+          <div class="seg">New equilibrium</div></div></div>
+        <div class="arow"><b>Kishotenketsu</b><div class="track" style="grid-template-columns:1fr 1fr 1fr 1fr">
+          <div class="seg" title="ki - introduction">Ki</div><div class="seg t2" title="sho - development">Sho</div>
+          <div class="seg t4" title="ten - the twist that recontextualizes">Ten - twist</div>
+          <div class="seg t2" title="ketsu - reconciliation">Ketsu</div></div></div>
+        <div class="arow"><b>Vogler 12</b><div class="track" style="grid-template-columns:10fr 7fr 6fr 7fr 8fr 14fr 8fr 9fr 7fr 8fr 9fr 7fr">
+          <div class="seg" title="Ordinary world">Ord. world</div><div class="seg" title="Call to adventure">Call</div>
+          <div class="seg" title="Refusal of the call">Refusal</div><div class="seg" title="Meeting the mentor">Mentor</div>
+          <div class="seg t2" title="Crossing the threshold">Threshold</div><div class="seg t2" title="Tests, allies, enemies">Tests</div>
+          <div class="seg t2" title="Approach to the inmost cave">Approach</div><div class="seg t4" title="The ordeal">Ordeal</div>
+          <div class="seg t3" title="Reward - seizing the sword">Reward</div><div class="seg t2" title="The road back">Road back</div>
+          <div class="seg t4" title="Resurrection">Resurr.</div><div class="seg" title="Return with the elixir">Return</div></div></div>
+        <div class="arow"><b>Harmon circle</b><div class="track" style="grid-template-columns:1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr">
+          <div class="seg">You</div><div class="seg">Need</div><div class="seg t2">Go</div><div class="seg t2">Search</div>
+          <div class="seg t4">Find</div><div class="seg t3">Take</div><div class="seg t2">Return</div><div class="seg">Change</div></div></div>
+        <div class="arow"><b>Seven-point</b><div class="track" style="grid-template-columns:8fr 14fr 16fr 16fr 16fr 16fr 14fr">
+          <div class="seg">Hook</div><div class="seg t2">Turn 1</div><div class="seg t3">Pinch 1</div>
+          <div class="seg t4">Midpoint</div><div class="seg t3">Pinch 2</div><div class="seg t2">Turn 2</div>
+          <div class="seg">Resolution</div></div></div>
+        <div class="arow"><b>Save the Cat</b><div class="track" style="grid-template-columns:4fr 3fr 8fr 4fr 8fr 4fr 5fr 14fr 5fr 12fr 5fr 6fr 5fr 13fr 4fr">
+          <div class="seg" title="Opening image">Open</div><div class="seg" title="Theme stated">Theme</div>
+          <div class="seg" title="Setup">Setup</div><div class="seg t3" title="Catalyst">Cat.</div>
+          <div class="seg" title="Debate">Debate</div><div class="seg t3" title="Break into two">Br.2</div>
+          <div class="seg" title="B story">B</div><div class="seg t2" title="Fun and games - the promise of the premise">Fun and games</div>
+          <div class="seg t4" title="Midpoint - false victory or false defeat">Mid</div>
+          <div class="seg t2" title="Bad guys close in">Bad guys close in</div>
+          <div class="seg t4" title="All is lost">Lost</div><div class="seg t3" title="Dark night of the soul">Dark night</div>
+          <div class="seg t3" title="Break into three">Br.3</div><div class="seg t2" title="Finale - five-part storming of the castle">Finale</div>
+          <div class="seg" title="Final image">Fin.</div></div></div>
+      </div>
+    </div>
+    <figcaption>Nine models on a shared 0-100% timeline. Darker cells mark the highest-pressure beats. Note the
+      agreement: almost every model puts a reversal near 50% and a maximum near 75-85%. Kishotenketsu is the outlier -
+      it has no conflict axis at all.</figcaption>
+  </figure>
+
+  <h3>The models in words</h3>
+  <dl class="terms">
+    <div><dt>Aristotle (Poetics)</dt><dd>Unified action with beginning, middle, end; <b>desis</b> (complication) and <b>lysis</b> (unravelling); <b>peripeteia</b> (reversal), <b>anagnorisis</b> (recognition), <b>hamartia</b> (the error), <b>catharsis</b>. Also the three unities (action, time, place) - action being the only one Aristotle insists on.</dd></div>
+    <div><dt>Freytag's pyramid</dt><dd>Exposition, rising action, climax, falling action, catastrophe. Built for five-act tragedy; misapplied to modern narrative it produces a fatally long tail after the climax.</dd></div>
+    <div><dt>Three-act / Field's paradigm</dt><dd>Setup (25%), confrontation (50%), resolution (25%), with plot point I at ~25%, midpoint at 50%, plot point II at ~75%.</dd></div>
+    <div><dt>Four-act</dt><dd>Splits act II at the midpoint into reaction and action halves; solves the "saggy middle" by making the midpoint a hard reversal.</dd></div>
+    <div><dt>Five-act (Yorke)</dt><dd>Act structure mapped to a character's progressive self-knowledge; each act ends with an irreversible act.</dd></div>
+    <div><dt>Kishotenketsu <span class="ru">(起承転結)</span></dt><dd>East Asian four-part form (Chinese <b>qi-cheng-zhuan-he</b>): introduction, development, a twist that is not a conflict but an unexpected element from outside, then reconciliation that reframes all three. Proves plot does not require antagonism.</dd></div>
+    <div><dt>Todorov's equilibrium model</dt><dd>Equilibrium -> disruption -> recognition of disruption -> attempt to repair -> new equilibrium. The most portable general schema.</dd></div>
+    <div><dt>Campbell's monomyth</dt><dd>Departure, initiation, return, across 17 stages: call, refusal, supernatural aid, threshold crossing, belly of the whale, road of trials, meeting the goddess, temptation, atonement with the father, apotheosis, ultimate boon, refusal of return, magic flight, rescue, crossing the return threshold, master of two worlds, freedom to live.</dd></div>
+    <div><dt>Vogler's writer's journey</dt><dd>Campbell reduced to 12 usable beats plus eight archetypes (hero, mentor, threshold guardian, herald, shapeshifter, shadow, ally, trickster).</dd></div>
+    <div><dt>Harmon's story circle</dt><dd>You / need / go / search / find / take / return / change - a circle split by an order axis and a chaos axis. The best short-form structure available.</dd></div>
+    <div><dt>Seven-point structure (Wells)</dt><dd>Hook, plot turn 1, pinch 1, midpoint (reaction -> action), pinch 2, plot turn 2, resolution. Designed backwards from the resolution.</dd></div>
+    <div><dt>Save the Cat (Snyder)</dt><dd>Fifteen beats with page targets; strongest as a diagnostic of pacing, weakest as a generator of originality.</dd></div>
+    <div><dt>Truby's 22 steps</dt><dd>Moral-argument-driven: weakness/need, desire, opponent, plan, drive, self-revelation, moral decision, new equilibrium. Ties structure to theme rather than to spectacle.</dd></div>
+    <div><dt>Story Grid (Coyne)</dt><dd>Genre conventions and <b>obligatory scenes</b>: each genre owes the reader specific scenes; failing to deliver them reads as a broken promise.</dd></div>
+    <div><dt>Fichtean curve</dt><dd>Open in medias res; a series of escalating crises with no long exposition; one climax; minimal falling action.</dd></div>
+    <div><dt>McKee's story triangle</dt><dd>Archplot (classical, closed, causal, single protagonist), miniplot (minimalist, open ending, internal conflict), antiplot (coincidence, non-linear, inconsistent realities).</dd></div>
+    <div><dt>Booker's seven basic plots</dt><dd>Overcoming the monster; rags to riches; the quest; voyage and return; comedy; tragedy; rebirth.</dd></div>
+    <div><dt>Polti's 36 dramatic situations</dt><dd>An exhaustive catalogue of dramatic predicaments (supplication, deliverance, revenge, pursuit, disaster, revolt, abduction, enigma, rivalry, adultery, madness, self-sacrifice, mistaken jealousy, remorse, recovery of a lost one, and so on). Useful as a generator when a plot is stuck.</dd></div>
+    <div><dt>Tobias's 20 master plots</dt><dd>Quest, adventure, pursuit, rescue, escape, revenge, riddle, rivalry, underdog, temptation, metamorphosis, transformation, maturation, love, forbidden love, sacrifice, discovery, wretched excess, ascension, descension.</dd></div>
+    <div><dt>Ring composition / chiastic structure</dt><dd>ABCBA: the centre carries the meaning and the outer terms rhyme. Ancient, and still the strongest shape for short fiction and for lyric sequences.</dd></div>
+    <div><dt>Non-linear architectures</dt><dd>Frame narrative (story within story), episodic, picaresque, braided/parallel, mosaic or modular, network narrative, reverse chronology, looping, forking-path.</dd></div>
+  </dl>
+
+  <h3>Emotional arcs (Vonnegut; confirmed at scale by Reagan et al., 2016)</h3>
+  <div class="arcs">
+    <div class="arc"><svg viewBox="0 0 100 40" role="img" aria-label="Rising line"><polyline points="2,34 98,7" fill="none" stroke="currentColor" stroke-width="2"/></svg><b>Rags to riches</b><span>Steady rise.</span></div>
+    <div class="arc"><svg viewBox="0 0 100 40" role="img" aria-label="Falling line"><polyline points="2,7 98,34" fill="none" stroke="currentColor" stroke-width="2"/></svg><b>Tragedy</b><span>Steady fall.</span></div>
+    <div class="arc"><svg viewBox="0 0 100 40" role="img" aria-label="Fall then rise"><polyline points="2,12 32,34 66,33 98,6" fill="none" stroke="currentColor" stroke-width="2"/></svg><b>Man in a hole</b><span>Fall, then recovery.</span></div>
+    <div class="arc"><svg viewBox="0 0 100 40" role="img" aria-label="Rise then fall"><polyline points="2,32 38,7 62,7 98,35" fill="none" stroke="currentColor" stroke-width="2"/></svg><b>Icarus</b><span>Rise, then fall.</span></div>
+    <div class="arc"><svg viewBox="0 0 100 40" role="img" aria-label="Rise fall rise"><polyline points="2,30 28,13 52,27 74,10 98,4" fill="none" stroke="currentColor" stroke-width="2"/></svg><b>Cinderella</b><span>Rise, setback, rise.</span></div>
+    <div class="arc"><svg viewBox="0 0 100 40" role="img" aria-label="Fall rise fall"><polyline points="2,9 26,31 56,13 98,36" fill="none" stroke="currentColor" stroke-width="2"/></svg><b>Oedipus</b><span>Fall, recovery, fall.</span></div>
+  </div>
+</section>
+
+<section id="s15">
+  <p class="num">15</p>
+  <h2>Formalist and structuralist toolkits</h2>
+  <p class="wide">These are grammars of narrative: attempts to find a finite set of units that generate all stories.
+    Even where the ambition failed, the units remain the sharpest analytic instruments available.</p>
+
+  <h3>Propp - Morphology of the Folktale (1928)</h3>
+  <p>Characters vary; <b>functions</b> - what a character does, defined by its consequence for the action - do not.
+    31 functions, always in the same order, never all present.</p>
+  <div class="scroll">
+  <table>
+    <thead><tr><th>Phase</th><th>Functions</th></tr></thead>
+    <tbody>
+      <tr><td>Preparation</td><td>1 absentation - 2 interdiction - 3 violation - 4 reconnaissance - 5 delivery - 6 trickery - 7 complicity</td></tr>
+      <tr><td>Complication</td><td>8 villainy or lack - 9 mediation - 10 beginning counteraction - 11 departure</td></tr>
+      <tr><td>Donor sequence</td><td>12 first function of the donor (testing) - 13 hero's reaction - 14 receipt of a magical agent</td></tr>
+      <tr><td>Struggle</td><td>15 guidance / transference - 16 struggle - 17 branding - 18 victory - 19 liquidation of the lack</td></tr>
+      <tr><td>Return</td><td>20 return - 21 pursuit - 22 rescue - 23 unrecognized arrival - 24 unfounded claims</td></tr>
+      <tr><td>Recognition</td><td>25 difficult task - 26 solution - 27 recognition - 28 exposure - 29 transfiguration - 30 punishment - 31 wedding</td></tr>
+      <tr><td>Spheres of action</td><td>villain - donor - helper - princess and her father - dispatcher - hero - false hero</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>Greimas - the actantial model</h3>
+  <p>Six actant roles on three axes. An actant is a function, not a person: one character can fill several roles, and
+    a role can be filled by an abstraction (society, fate, an illness).</p>
+  <figure>
+    <div class="scroll">
+    <svg viewBox="0 0 660 230" style="width:100%;min-width:560px;height:auto" role="img"
+         aria-label="Greimas actantial model: sender, object, receiver on the top row; helper, subject, opponent on the bottom row">
+      <defs>
+        <marker id="ah" markerWidth="9" markerHeight="9" refX="7" refY="3.2" orient="auto">
+          <path d="M0,0 L7,3.2 L0,6.4 z" fill="currentColor"/>
+        </marker>
+      </defs>
+      <g style="color:var(--accent)" stroke="currentColor" stroke-width="1.4" fill="none">
+        <line x1="170" y1="42" x2="250" y2="42" marker-end="url(#ah)"/>
+        <line x1="390" y1="42" x2="470" y2="42" marker-end="url(#ah)"/>
+        <line x1="320" y1="152" x2="320" y2="80" marker-end="url(#ah)"/>
+        <line x1="170" y1="182" x2="250" y2="182" marker-end="url(#ah)"/>
+        <line x1="490" y1="182" x2="410" y2="182" marker-end="url(#ah)"/>
+      </g>
+      <g fill="var(--surface)" stroke="var(--rule)" stroke-width="1">
+        <rect x="40" y="20" width="130" height="44" rx="3"/><rect x="255" y="20" width="130" height="44" rx="3"/>
+        <rect x="475" y="20" width="130" height="44" rx="3"/><rect x="40" y="160" width="130" height="44" rx="3"/>
+        <rect x="255" y="160" width="130" height="44" rx="3"/><rect x="475" y="160" width="130" height="44" rx="3"/>
+      </g>
+      <g class="lbl" text-anchor="middle">
+        <text x="105" y="47">SENDER</text><text x="320" y="47">OBJECT</text><text x="540" y="47">RECEIVER</text>
+        <text x="105" y="187">HELPER</text><text x="320" y="187">SUBJECT</text><text x="540" y="187">OPPONENT</text>
+      </g>
+      <g class="lbl-s" text-anchor="middle">
+        <text x="210" y="34">axis of</text><text x="210" y="90">transmission</text>
+        <text x="345" y="118">axis of desire</text>
+        <text x="320" y="222">axis of power</text>
+      </g>
+    </svg>
+    </div>
+    <figcaption>Greimas (1966). Sender motivates the quest, subject pursues the object for a receiver, helper and
+      opponent modulate the effort.</figcaption>
+  </figure>
+  <dl class="terms">
+    <div><dt>Semiotic square (Greimas)</dt><dd>Meaning generated from a term, its contrary, and their contradictories (S1 / S2 / not-S1 / not-S2). A generator of the positions a narrative can still occupy.</dd></div>
+    <div><dt>Isotopy</dt><dd>A repeated semantic thread that keeps a text coherent; the reader reads along it.</dd></div>
+  </dl>
+
+  <h3>Barthes, Bremond, Levi-Strauss, Chatman</h3>
+  <dl class="terms">
+    <div><dt>Barthes' five codes (S/Z)</dt><dd><b>Hermeneutic</b> (enigmas posed and delayed), <b>proairetic</b> (actions and their consequences), <b>semic</b> (connotative traits, mostly character), <b>symbolic</b> (deep oppositions), <b>referential/cultural</b> (appeals to shared knowledge). Reading = tracking five simultaneous threads.</dd></div>
+    <div><dt>Cardinal functions vs catalysers (Barthes)</dt><dd>Cardinal functions (<b>noyaux</b>) open real alternatives and change the course; catalysers fill the space between them. Indices point to character or atmosphere; informants situate.</dd></div>
+    <div><dt>Kernels and satellites (Chatman)</dt><dd>The same distinction restated: removing a kernel destroys the story's logic; removing a satellite only impoverishes it.</dd></div>
+    <div><dt>Readerly vs writerly (Barthes)</dt><dd><b>Lisible</b> texts consume smoothly; <b>scriptible</b> texts force the reader to produce meaning.</dd></div>
+    <div><dt>Bremond's narrative logic</dt><dd>Every sequence is a triad: a possibility opens -> it is actualized or not -> it succeeds or fails. Narrative as a tree of choices rather than a fixed chain.</dd></div>
+    <div><dt>Todorov's narrative syntax</dt><dd>Narrative treated grammatically: characters = nouns, attributes = adjectives, actions = verbs; propositions combine into sequences.</dd></div>
+    <div><dt>Levi-Strauss - mythemes</dt><dd>Myth decomposed into minimal units whose meaning lies in bundles of binary oppositions (raw/cooked, nature/culture); the story mediates a contradiction it cannot solve.</dd></div>
+    <div><dt>Souriau's 200,000 dramatic situations</dt><dd>Six dramatic functions (lion, sun, earth, mars, scales, moon) combinatorially generating situations - the precursor of the actantial model.</dd></div>
+  </dl>
+</section>
+
+<section id="s16">
+  <p class="num">16</p>
+  <h2>Genette: order, duration, frequency, mood, voice</h2>
+  <p class="wide"><i>Narrative Discourse</i> (1972) remains the most complete taxonomy of how telling deviates from
+    happening. Five categories, each fully independent of the others.</p>
+
+  <h3>Order - the relation between story time and text order</h3>
+  <dl class="terms">
+    <div><dt>Anachrony</dt><dd>Any discordance between the order of events and their narration.</dd></div>
+    <div><dt>Analepsis</dt><dd>Retrospection (flashback). <b>External</b> = before the first narrative's start; <b>internal</b> = inside its span; <b>mixed</b> = crossing it.</dd></div>
+    <div><dt>Prolepsis</dt><dd>Anticipation (flash-forward), including the announced future ("years later he would...").</dd></div>
+    <div><dt>Reach and extent</dt><dd>How far back or forward the anachrony goes, and how much story time it covers.</dd></div>
+    <div><dt>Achrony</dt><dd>Events whose temporal position cannot be fixed at all.</dd></div>
+    <div><dt>Syllepsis</dt><dd>Grouping by a non-chronological principle (all scenes in one room, all meals, all letters).</dd></div>
+  </dl>
+
+  <h3>Duration - speed</h3>
+  <div class="scroll">
+  <table>
+    <thead><tr><th>Device</th><th>Story time vs text time</th><th>Effect</th></tr></thead>
+    <tbody>
+      <tr><td>Ellipsis</td><td>Story time passes, text time zero</td><td>Maximum speed; the reader infers the gap</td></tr>
+      <tr><td>Summary</td><td>Text shorter than story</td><td>Compression, transition, control of proportion</td></tr>
+      <tr><td>Scene</td><td>Roughly equal (dialogue)</td><td>Real-time immersion; the default of dramatic writing</td></tr>
+      <tr><td>Stretch</td><td>Text longer than story</td><td>Slow motion; perception dilated at high pressure</td></tr>
+      <tr><td>Pause</td><td>Story time zero, text continues</td><td>Description or commentary; suspends the clock</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>Frequency</h3>
+  <dl class="terms">
+    <div><dt>Singulative</dt><dd>Telling once what happened once (the unmarked default).</dd></div>
+    <div><dt>Repeating</dt><dd>Telling n times what happened once - the Rashomon structure; each retelling revises.</dd></div>
+    <div><dt>Iterative</dt><dd>Telling once what happened n times ("every Sunday we would..."). Builds a world's texture cheaply.</dd></div>
+    <div><dt>Pseudo-iterative</dt><dd>A scene too detailed to have literally recurred, presented as habitual - a signature move of Proust.</dd></div>
+  </dl>
+
+  <h3>Mood - distance and perspective</h3>
+  <dl class="terms">
+    <div><dt>Focalization</dt><dd>Who <b>perceives</b>, as distinct from who speaks. <b>Zero</b> (unrestricted, narrator knows more than any character), <b>internal</b> (fixed, variable or multiple - restricted to a character's field), <b>external</b> (behaviour only, no interiority: the camera or "hard-boiled" mode).</dd></div>
+    <div><dt>Paralipsis / paralepsis</dt><dd>Giving less information than the chosen focalization permits (withholding what the viewpoint character knows) / giving more than it permits (a lapse or a deliberate breach).</dd></div>
+    <div><dt>Distance of speech</dt><dd><b>Narratized</b> (the fact of speaking reported), <b>transposed</b> (indirect discourse), <b>reported</b> (direct quotation) - increasing mimesis, decreasing narratorial control.</dd></div>
+    <div><dt>Free indirect discourse <span class="ru">(несобственно-прямая речь)</span></dt><dd>Character's idiom and viewpoint inside third-person narration without quotation marks or tags. The most powerful device in prose fiction: irony and intimacy simultaneously.</dd></div>
+    <div><dt>Psycho-narration / narrated monologue / quoted monologue (Cohn)</dt><dd>Three levels of rendering consciousness: narrator's language about a mind; the mind's language in the narrator's grammar; the mind's own words.</dd></div>
+  </dl>
+
+  <h3>Voice - who narrates, when, from what level</h3>
+  <dl class="terms">
+    <div><dt>Time of narrating</dt><dd><b>Subsequent</b> (past tense, standard), <b>prior</b> (predictive), <b>simultaneous</b> (present tense), <b>interpolated</b> (between events - the epistolary and diary form).</dd></div>
+    <div><dt>Narrative levels</dt><dd><b>Extradiegetic</b> (the outermost telling), <b>intradiegetic</b> (inside the storyworld), <b>metadiegetic</b> (a story told within that story).</dd></div>
+    <div><dt>Metalepsis</dt><dd>Transgression of those levels - the narrator addressing a character, a character escaping the frame. Comedy, horror or vertigo, never neutral.</dd></div>
+    <div><dt>Person</dt><dd><b>Heterodiegetic</b> (narrator absent from the story), <b>homodiegetic</b> (present as a character), <b>autodiegetic</b> (present as the protagonist).</dd></div>
+    <div><dt>Narratee</dt><dd>The addressee inside the text, distinct from the real reader. Making the narratee explicit changes everything about the narrator's tone.</dd></div>
+  </dl>
+</section>
+
+<section id="s17">
+  <p class="num">17</p>
+  <h2>Narrators and perspective</h2>
+  <dl class="terms">
+    <div><dt>Omniscient</dt><dd>Unrestricted access. <b>Intrusive</b> (comments, judges, addresses) or <b>objective/effaced</b> (reports without commentary).</dd></div>
+    <div><dt>Limited third</dt><dd>One consciousness at a time; the dominant contemporary mode because it combines interiority with narrative control.</dd></div>
+    <div><dt>Central consciousness / reflector (James)</dt><dd>Events refracted entirely through one character's mind, without that character narrating.</dd></div>
+    <div><dt>First person</dt><dd>Narrating self vs experiencing self - the gap between them is where retrospective irony lives.</dd></div>
+    <div><dt>Second person</dt><dd>"You" as protagonist: implication, accusation, or instruction manual. Hard to sustain; excellent at short length.</dd></div>
+    <div><dt>Collective "we"</dt><dd>A community as narrator; individuals blur, judgement becomes ambient.</dd></div>
+    <div><dt>Camera-eye / dramatic</dt><dd>Pure exteriority; the reader must infer all interiority.</dd></div>
+    <div><dt>Unreliable narrator (Booth)</dt><dd>The narrator's account diverges from the implied author's norms. Phelan's six axes: <b>misreporting / underreporting</b> (facts), <b>misreading / underreading</b> (interpretation), <b>misregarding / underregarding</b> (ethics).</dd></div>
+    <div><dt>Fallible vs untrustworthy</dt><dd>The narrator who cannot know (a child, the deluded) vs the narrator who will not tell (the liar). Different contracts with the reader.</dd></div>
+    <div><dt>Implied author</dt><dd>The version of the author the text itself implies - the source of the norms against which unreliability is measured.</dd></div>
+    <div><dt>Implied reader</dt><dd>The reader the text presupposes and constructs.</dd></div>
+    <div><dt>Skaz <span class="ru">(сказ)</span></dt><dd>Narration imitating oral, socially marked speech; the manner of telling becomes the main object of interest (Leskov, Zoshchenko).</dd></div>
+    <div><dt>Epistolary / found-document</dt><dd>Narration as artefact: letters, diaries, files, transcripts, chat logs. Buys immediacy plus built-in unreliability.</dd></div>
+    <div><dt>Stream of consciousness / interior monologue</dt><dd>Associative pre-verbal flow vs organized silent speech - often conflated, structurally different.</dd></div>
+    <div><dt>Frame narrator</dt><dd>A teller who introduces another teller; every frame adds a filter and an agenda.</dd></div>
+    <div><dt>Polyphony (Bakhtin)</dt><dd>Multiple fully-valid consciousnesses, none subordinated to the author's voice; opposed to monologic narration where all voices serve one truth.</dd></div>
+    <div><dt>Heteroglossia (Bakhtin)</dt><dd>The novel as a battleground of social languages; each register carries an ideology.</dd></div>
+  </dl>
+</section>
+
+<section id="s18">
+  <p class="num">18</p>
+  <h2>Character</h2>
+  <dl class="terms">
+    <div><dt>Round vs flat (Forster)</dt><dd>Capable of surprising convincingly vs constructed around a single idea. Flat is not a defect - it is a function choice.</dd></div>
+    <div><dt>Dynamic vs static</dt><dd>Changed by the events vs unchanged (the unchanging character is often the instrument that changes others).</dd></div>
+    <div><dt>Protagonist / antagonist / deuteragonist / foil</dt><dd>Roles defined by relation to the central desire, not by moral standing. A foil exists to make a trait visible by contrast.</dd></div>
+    <div><dt>Want vs need</dt><dd>The conscious external goal vs the unconscious internal lack. Plot is driven by want; theme is resolved by need. Their conflict is the arc.</dd></div>
+    <div><dt>The lie the character believes</dt><dd>A false belief about self or world, formed by the <b>wound</b> (backstory trauma, also called the ghost). The arc is the process of testing that lie.</dd></div>
+    <div><dt>Character arcs</dt><dd><b>Positive change</b> (lie -> truth), <b>flat/testing</b> (character holds a truth and changes the world), <b>negative</b> in three variants: disillusionment (truth learned, world worse), fall (lie doubled down), corruption (truth known, lie chosen).</dd></div>
+    <div><dt>Agency</dt><dd>Whether the character causes events or is carried by them. Sustained passivity reads as a structural fault regardless of how well written.</dd></div>
+    <div><dt>Motivation and stakes</dt><dd>Why this, why now, and what happens if they fail. Weak motivation shows up as plot-serving behaviour.</dd></div>
+    <div><dt>Direct vs indirect characterization</dt><dd>Told attributes vs inference from action, speech, appearance, environment and others' reactions.</dd></div>
+    <div><dt>Ethos / moral argument</dt><dd>The character's values put under pressure until a choice reveals them; the choice, not the statement, is the characterization.</dd></div>
+    <div><dt>Character functions (Propp/Greimas)</dt><dd>Villain, donor, helper, dispatcher, false hero - roles are dramaturgical slots, and one figure can occupy several in sequence.</dd></div>
+    <div><dt>Ensemble design</dt><dd>Each character embodies a different possible answer to the story's central question; overlap between two characters is a sign one should be cut or merged.</dd></div>
+  </dl>
+</section>
+
+<section id="s19">
+  <p class="num">19</p>
+  <h2>Conflict, causality, escalation</h2>
+  <dl class="terms">
+    <div><dt>Conflict types</dt><dd>Person vs person, self, society, nature, machine/technology, fate or god, and the unknown. The classification matters less than knowing which one the scene in front of you is actually running.</dd></div>
+    <div><dt>Dramatic question</dt><dd>The single yes/no question the narrative poses early and answers at the climax. If a reader cannot name it, the structure is unclear.</dd></div>
+    <div><dt>Therefore / but, not "and then" (Stone &amp; Parker)</dt><dd>Beats must connect causally or adversatively. A chain of "and then" is chronicle, not plot.</dd></div>
+    <div><dt>Try-fail cycles</dt><dd>Attempts that fail in escalating ways ("no, and..." / "yes, but..."), proving the problem's difficulty before the solution is allowed.</dd></div>
+    <div><dt>Complication vs dilemma</dt><dd>A problem has a right answer; a dilemma forces a choice between two goods or two evils. Dilemmas characterize; problems only delay.</dd></div>
+    <div><dt>Reversal (peripeteia)</dt><dd>Action produces the opposite of its intent; the most efficient generator of both plot and irony.</dd></div>
+    <div><dt>Recognition (anagnorisis)</dt><dd>Ignorance to knowledge. Strongest when it coincides with the reversal, as Aristotle noted.</dd></div>
+    <div><dt>Point of no return</dt><dd>The threshold after which retreat is impossible; usually placed at the first act break.</dd></div>
+    <div><dt>Escalation</dt><dd>Each crisis costs more than the last. Flat stakes read as repetition even when events differ.</dd></div>
+    <div><dt>Chekhov's gun</dt><dd>Remove everything that has no bearing; a rifle on the wall in act one must fire. A planting-and-payoff economy, not merely a prohibition.</dd></div>
+    <div><dt>Setup and payoff</dt><dd>Every payoff needs an earlier plant, placed where it is noticed but not weighted. Unplanted payoff = deus ex machina; unpaid plant = a loose thread.</dd></div>
+    <div><dt>Deus ex machina</dt><dd>External resolution not derived from the established causal system. Legitimate only when the story is <b>about</b> the arbitrariness of rescue.</dd></div>
+    <div><dt>MacGuffin</dt><dd>An object whose only function is to motivate pursuit; its nature is irrelevant to the audience.</dd></div>
+    <div><dt>Ticking clock</dt><dd>An externally imposed deadline that converts drift into pressure.</dd></div>
+    <div><dt>Obstacle taxonomy</dt><dd>Physical, social, internal, and the antagonist's counter-plan. A scene without at least one is exposition.</dd></div>
+  </dl>
+</section>
+
+<section id="s20">
+  <p class="num">20</p>
+  <h2>Time, space and world</h2>
+  <dl class="terms">
+    <div><dt>Story time vs discourse time</dt><dd>The duration of events vs the time the telling takes. Pace is the ratio, managed scene by scene.</dd></div>
+    <div><dt>Chronotope (Bakhtin) <span class="ru">(хронотоп)</span></dt><dd>The inseparable fusion of time and space that defines a genre - the road, the threshold, the provincial town, the castle, the idyll. Choosing a chronotope pre-selects the kinds of event that can happen.</dd></div>
+    <div><dt>Setting as agent</dt><dd>Environment that constrains, resists or produces action, as opposed to backdrop.</dd></div>
+    <div><dt>Exposition strategies</dt><dd><b>In medias res</b>, incluing (information seeded through use rather than explanation), the infodump and its legitimate uses (comedy, documents, deliberate density), delayed decoding.</dd></div>
+    <div><dt>Worldbuilding depth</dt><dd>The iceberg principle (Hemingway): what is omitted still exerts pressure if the author actually knows it.</dd></div>
+    <div><dt>Narrative pace</dt><dd>Controlled by sentence length, scene/summary ratio, information release rate and the frequency of unanswered questions.</dd></div>
+    <div><dt>Rhythm of scene and sequel (Swain)</dt><dd>Scene = goal, conflict, disaster. Sequel = reaction, dilemma, decision - which sets the next goal. Alternation is the base pulse of commercial fiction.</dd></div>
+    <div><dt>Temporal structures</dt><dd>Linear, non-linear, circular, reverse, parallel, time-loop, multi-timeline, fragmented/mosaic. Each imposes a different reading task.</dd></div>
+    <div><dt>Deadline and duration</dt><dd>Compressed timeframes raise pressure automatically; long spans buy transformation but cost momentum.</dd></div>
+  </dl>
+</section>
+
+<section id="s21">
+  <p class="num">21</p>
+  <h2>Tension mechanics - how attention is held</h2>
+  <dl class="terms">
+    <div><dt>Sternberg's three universal interests</dt><dd><b>Suspense</b> (uncertainty about the future), <b>curiosity</b> (gaps in the past), <b>surprise</b> (a gap concealed, then revealed). Every narrative gap produces one of the three; choosing which is a design decision.</dd></div>
+    <div><dt>Suspense vs surprise (Hitchcock)</dt><dd>Show the bomb under the table and the audience suffers for ten minutes; hide it and they get one second of shock. Information given to the reader but not the character is usually worth more than a twist.</dd></div>
+    <div><dt>Dramatic irony</dt><dd>The structural form of that asymmetry: the reader knows what the character does not.</dd></div>
+    <div><dt>Foreshadowing</dt><dd>Advance signalling that makes the later event feel inevitable rather than arbitrary. Too explicit = prediction; too faint = coincidence.</dd></div>
+    <div><dt>Red herring</dt><dd>A deliberate false lead; ethical only if the true solution was equally available.</dd></div>
+    <div><dt>Gaps and blanks (Iser)</dt><dd>The unwritten places the reader must fill; the source of engagement, and of interpretive freedom.</dd></div>
+    <div><dt>Delay / retardation (Shklovsky)</dt><dd>Digression, embedded tales, repetition and stepped structures that hold off the resolution - plot construction as the art of postponement.</dd></div>
+    <div><dt>Narrative desire (Peter Brooks)</dt><dd>Plot as a form of desire that both drives toward the end and resists arriving; the middle is the necessary detour.</dd></div>
+    <div><dt>Cliffhanger</dt><dd>Segment ends at maximum uncertainty; serial form's basic instrument.</dd></div>
+    <div><dt>The promise, the progress, the payoff (Sanderson)</dt><dd>Reader satisfaction is a function of promises made early, visible progress in the middle, and payoff that exceeds - but matches - the promise.</dd></div>
+    <div><dt>Enigma / hermeneutic delay (Barthes)</dt><dd>Posing a question, then snaring, equivocating, partially answering, and finally disclosing. A named sequence of stalling moves.</dd></div>
+    <div><dt>Obligatory scene</dt><dd>The confrontation the premise promises; skipping it is the single most common structural betrayal.</dd></div>
+  </dl>
+</section>
+
+<section id="s22">
+  <p class="num">22</p>
+  <h2>The theme layer</h2>
+  <dl class="terms">
+    <div><dt>Theme vs premise vs moral</dt><dd>Theme = the question the story keeps asking; premise = the situation that generates it; moral = an answer imposed from outside, which narrative rarely survives.</dd></div>
+    <div><dt>Controlling idea (McKee)</dt><dd>One sentence: value + cause. "Justice prevails when the ordinary person is more cunning than the criminal." Every scene should be testable against it.</dd></div>
+    <div><dt>Thematic argument</dt><dd>Theme staged as a debate between characters who each embody a possible answer; the climax adjudicates.</dd></div>
+    <div><dt>Motif and leitmotif</dt><dd>A repeated concrete element (object, phrase, sound) that accrues meaning; leitmotif ties it to a specific character or idea.</dd></div>
+    <div><dt>Symbol / allegory / parable / fable</dt><dd>Increasing degrees of enforced correspondence between story and meaning.</dd></div>
+    <div><dt>Subtext</dt><dd>What the scene is really about while the dialogue discusses something else. In practice: characters almost never say what they want.</dd></div>
+    <div><dt>Irony as structure</dt><dd>Not only a tone: the outcome that inverts the intention is the most thematically dense event available.</dd></div>
+    <div><dt>Mythos and archetype (Frye)</dt><dd>Comedy, romance, tragedy and irony/satire as the four narrative pre-genres, cyclically related.</dd></div>
+  </dl>
+</section>
+
+<section id="s23">
+  <p class="num">23</p>
+  <h2>Reader-side and cognitive narratology</h2>
+  <dl class="terms">
+    <div><dt>Experientiality (Fludernik)</dt><dd>Natural narratology's claim: narrative is defined not by plot but by the representation of <b>lived experience</b>. Explains why plotless texts still read as stories.</dd></div>
+    <div><dt>Rhetorical narratology (Booth, Phelan)</dt><dd>Narrative as an act of communication - somebody telling somebody else, on some occasion, for some purpose. Judgements (interpretive, ethical, aesthetic) are the reader's central activity.</dd></div>
+    <div><dt>Mimetic / thematic / synthetic (Phelan)</dt><dd>Three components of every character: person-like, idea-representing, and artificial construct. Genres differ in which they foreground.</dd></div>
+    <div><dt>Theory of mind / mind-reading (Zunshine)</dt><dd>Fiction exercises the tracking of nested intentions ("she thinks that he believes that..."); embedment depth is a real cognitive load.</dd></div>
+    <div><dt>Transportation / immersion</dt><dd>Absorption measurably reduces counter-arguing - part of why narrative persuades where argument fails.</dd></div>
+    <div><dt>Narrative empathy</dt><dd>Reader feeling with a character; produced by shared vulnerability and interiority, not by likeability.</dd></div>
+    <div><dt>Schema, script and frame</dt><dd>Stored knowledge structures (the restaurant script) that let narratives omit almost everything; violating them is where meaning is generated.</dd></div>
+    <div><dt>Deictic shift theory</dt><dd>Readers relocate their here-now-I into the storyworld; consistency of deictic centre governs how immersive a passage feels.</dd></div>
+    <div><dt>Possible worlds theory (Ryan, Dolezel)</dt><dd>The storyworld as one world among alternatives; the <b>principle of minimal departure</b> says readers assume it matches the actual world except where told otherwise.</dd></div>
+    <div><dt>Willing suspension of disbelief (Coleridge)</dt><dd>Better restated as "poetic faith": the reader grants a premise and then holds the text to strict internal consistency.</dd></div>
+    <div><dt>Fictional recentring</dt><dd>Treating the fictional world as actual for the duration of reading - the mechanism behind emotional response to known fictions.</dd></div>
+  </dl>
+</section>
+
+<section id="s24">
+  <p class="num">24</p>
+  <h2>Post-classical schools</h2>
+  <dl class="terms">
+    <div><dt>Feminist narratology (Lanser)</dt><dd>Narrative authority and voice as gendered: public vs private narration, communal voice, who is granted the right to tell.</dd></div>
+    <div><dt>Unnatural narratology (Alber, Richardson)</dt><dd>Narratives with physically or logically impossible elements (contradictory events, omniscient "we", speaking corpses) - not deviations but a separate poetics.</dd></div>
+    <div><dt>Transmedia narratology (Jenkins)</dt><dd>A story distributed across media, each contributing a distinct, non-redundant part of the whole.</dd></div>
+    <div><dt>Ludonarratology</dt><dd>Interactive narrative: <b>embedded</b> (authored, pre-placed) vs <b>emergent</b> (produced by system dynamics) story; environmental storytelling; ludonarrative dissonance between what the game says and what it rewards.</dd></div>
+    <div><dt>Interactive structures</dt><dd>Branching tree, foldback, string of pearls (linear spine, free interiors), hub-and-spoke, quest graph, procedural generation.</dd></div>
+    <div><dt>Econarratology</dt><dd>Storyworlds read for their environmental imagination; place and non-human agency as narrative elements.</dd></div>
+    <div><dt>Queer / postcolonial narratology</dt><dd>Whose plots are available (the marriage plot, the bildungsroman) and what narrative shapes exclude; counter-narrative as method.</dd></div>
+    <div><dt>Cognitive narratology (Herman)</dt><dd>Narrative as a tool for thinking: a way of modelling agency, time and causality rather than merely representing them.</dd></div>
+    <div><dt>Digital and database narrative (Manovich)</dt><dd>Database vs narrative as competing cultural forms; hypertext, non-sequential reading, generative and AI-assisted narration.</dd></div>
+  </dl>
+</section>
+
+<section id="s25">
+  <p class="num">25</p>
+  <h2>Workshop vocabulary - the applied layer</h2>
+  <dl class="terms">
+    <div><dt>Beat</dt><dd>The smallest unit of change: an exchange or action after which the scene's state is different.</dd></div>
+    <div><dt>Scene / sequel; MRU</dt><dd>Scene (goal-conflict-disaster) alternating with sequel (reaction-dilemma-decision); inside prose, motivation-reaction units keep cause before effect.</dd></div>
+    <div><dt>Value charge</dt><dd>Every scene should turn from positive to negative or the reverse. A scene that ends charged as it began is cuttable.</dd></div>
+    <div><dt>In medias res / cold open</dt><dd>Begin inside the action; supply orientation afterwards, in motion.</dd></div>
+    <div><dt>Inciting incident / catalyst</dt><dd>The event that disturbs equilibrium and creates the dramatic question.</dd></div>
+    <div><dt>Midpoint mirror</dt><dd>A false victory or false defeat at 50% that reverses the protagonist's mode from reactive to active.</dd></div>
+    <div><dt>All is lost / dark night of the soul</dt><dd>Maximum pressure plus the whiff of death; the point where the old strategy is exhausted.</dd></div>
+    <div><dt>Climax and denouement</dt><dd>The decisive confrontation, then the settling of consequences. Modern practice keeps the denouement short and concrete.</dd></div>
+    <div><dt>Coda / epilogue</dt><dd>A separated final movement, temporally displaced; earns its place only by changing the meaning of the ending.</dd></div>
+    <div><dt>Framing device / bookending</dt><dd>An outer narrative that opens and closes the text; the return must reinterpret the frame, not merely close it.</dd></div>
+    <div><dt>Subplot / B-story</dt><dd>Usually carries the theme and the relationship that teaches the protagonist what the A-plot cannot.</dd></div>
+    <div><dt>Braiding</dt><dd>Two or more strands alternated so each cliff hands off to the other; the pacing engine of long-form.</dd></div>
+    <div><dt>Iceberg / omission (Hemingway)</dt><dd>Deliberate omission strengthens a story only when the omitted material is genuinely known to the writer.</dd></div>
+    <div><dt>Hat on a hat</dt><dd>Two devices doing the same job at the same moment; cut one.</dd></div>
+    <div><dt>Idiot plot</dt><dd>A plot that only works because everyone declines to ask an obvious question.</dd></div>
+    <div><dt>Refrigerator logic</dt><dd>The story holds while reading and collapses an hour later - a sign of unearned causality.</dd></div>
+  </dl>
+</section>
+
+<section id="s26">
+  <p class="num">26</p>
+  <h2>Narrative inside the lyric - where the two halves meet</h2>
+  <p class="wide">A short poem rarely tells a story, but it almost always has narrative structure. The most useful
+    imports from Part II into Part I:</p>
+  <dl class="terms">
+    <div><dt>Volta = peripeteia</dt><dd>The lyric turn is a reversal at a compressed scale; place it where a plot would place its midpoint or its recognition.</dd></div>
+    <div><dt>Fabula behind the lyric</dt><dd>Even a static poem implies a chronology (something happened before the utterance). Deciding that implied fabula, then deleting most of it, is a reliable drafting method.</dd></div>
+    <div><dt>Occasion = inciting incident</dt><dd>The pressure that makes the speaker speak now. Nearly all "flat" poems are missing it.</dd></div>
+    <div><dt>Focalization in lyric</dt><dd>Restricting what the speaker can see or know produces the same irony and suspense in 14 lines as in 400 pages.</dd></div>
+    <div><dt>Ellipsis and gap</dt><dd>Poetry's default duration setting: the unstated interval between stanzas is doing the same work as a chapter break.</dd></div>
+    <div><dt>Iterative mode</dt><dd>"Every winter he..." - grants a whole biography in one line; the cheapest depth available to a short poem.</dd></div>
+    <div><dt>Eventfulness test</dt><dd>Schmid's criteria applied to a lyric: did anything change, irreversibly, unpredictably? If not, the poem must earn its keep by perception rather than event - and should be built accordingly.</dd></div>
+    <div><dt>Ballad and verse narrative</dt><dd>Where the two systems fully merge: leaping omission, refrain as chorus-commentary, incremental repetition, dialogue without attribution.</dd></div>
+    <div><dt>Lyric sequence</dt><dd>Poems arranged so that the gaps between them carry the plot; ring composition and braiding apply directly.</dd></div>
+  </dl>
+  <div class="callout">
+    <b>Working method</b>
+    <p>Draft the poem's meaning as a one-sentence <b>controlling idea</b> (§22) and a one-sentence <b>occasion</b>
+      (§1). Build the images that would force a reader to that idea without stating it (§2, §3). Place the turn
+      (§4, §6). Then cut the statement of the idea out of the poem entirely - if the poem still delivers it, the
+      poem is finished; if not, the images are not yet load-bearing.</p>
+  </div>
+</section>
+
+<section id="s27">
+  <p class="num">27</p>
+  <h2>Sources worth going to directly</h2>
+  <h3>Poetics of meaning</h3>
+  <ul class="plain">
+    <li>Aristotle, <i>Poetics</i>; Longinus, <i>On the Sublime</i>.</li>
+    <li>Cleanth Brooks, <i>The Well Wrought Urn</i> - paradox and the heresy of paraphrase.</li>
+    <li>William Empson, <i>Seven Types of Ambiguity</i>.</li>
+    <li>I.A. Richards, <i>The Philosophy of Rhetoric</i> - tenor and vehicle.</li>
+    <li>T.S. Eliot, <i>Tradition and the Individual Talent</i>; <i>Hamlet and His Problems</i>.</li>
+    <li>Barbara Herrnstein Smith, <i>Poetic Closure</i>.</li>
+    <li>Lakoff &amp; Johnson, <i>Metaphors We Live By</i>.</li>
+    <li>Mary Kinzie, <i>A Poet's Guide to Poetry</i>; James Longenbach, <i>The Art of the Poetic Line</i>.</li>
+    <li>Robert Bly, <i>Leaping Poetry</i>; Charles Olson, <i>Projective Verse</i>.</li>
+    <li>Шкловский, <i>Искусство как приём</i>; Тынянов, <i>Проблема стихотворного языка</i>; Лотман, <i>Анализ поэтического текста</i>; Мандельштам, <i>Разговор о Данте</i>.</li>
+  </ul>
+  <h3>Narrative theory</h3>
+  <ul class="plain">
+    <li>Vladimir Propp, <i>Morphology of the Folktale</i>; A.J. Greimas, <i>Structural Semantics</i>.</li>
+    <li>Roland Barthes, <i>S/Z</i>; <i>Introduction to the Structural Analysis of Narratives</i>.</li>
+    <li>Gerard Genette, <i>Narrative Discourse</i> - the indispensable one.</li>
+    <li>Seymour Chatman, <i>Story and Discourse</i>; Mieke Bal, <i>Narratology</i>; Shlomith Rimmon-Kenan, <i>Narrative Fiction</i>.</li>
+    <li>Wayne Booth, <i>The Rhetoric of Fiction</i>; James Phelan, <i>Living to Tell About It</i>.</li>
+    <li>Peter Brooks, <i>Reading for the Plot</i>; Monika Fludernik, <i>Towards a 'Natural' Narratology</i>.</li>
+    <li>David Herman, <i>Story Logic</i>; Marie-Laure Ryan, <i>Possible Worlds, Artificial Intelligence and Narrative Theory</i>.</li>
+    <li>Бахтин, <i>Вопросы литературы и эстетики</i> (хронотоп, слово в романе); <i>Проблемы поэтики Достоевского</i>.</li>
+    <li>Craft side: McKee <i>Story</i>; Truby <i>The Anatomy of Story</i>; Yorke <i>Into the Woods</i>; Snyder <i>Save the Cat</i>; Egri <i>The Art of Dramatic Writing</i>.</li>
+    <li>Reagan et al., "The emotional arcs of stories are dominated by six basic shapes" (2016).</li>
+  </ul>
+</section>
+
+<footer>
+  <p>Two vocabularies, one purpose: naming the parts so revision has something to grip. Nothing here is prescriptive -
+    every rule listed has a masterpiece that breaks it, and knowing which rule is being broken is the whole
+    of the craft.</p>
+</footer>
+
+</main>
+</div>
+</body>
+</html>
