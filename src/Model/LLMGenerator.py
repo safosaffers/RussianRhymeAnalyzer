@@ -5,7 +5,7 @@ import os
 from Model.Generator import Generator, GenParams
 from Model.Poetics import poetics_text
 from Model.PoemSpec import PoemSpec, SCHEMA as SPEC_SCHEMA
-from Model import Roles
+from Model import Roles, Techniques
 
 # по умолчанию — самая способная модель; можно переопределить через окружение
 DEFAULT_MODEL = os.environ.get("RHYMER_MODEL", "claude-opus-4-8")
@@ -108,15 +108,21 @@ class LLMGenerator(Generator):
 
     def generate(self, params: GenParams, n: int) -> list[str]:
         theme = params.theme.strip() or "свободная тема"
+        # акростих и родня задают длину жёстко — иначе требование невыполнимо
+        n_lines = Techniques.required_lines(params.techniques) or params.n_lines
         user = (
             f"Сочини {n} РАЗНЫХ вариантов стихотворения.\n"
             f"Тема: {theme}\n"
             f"Размер: {params.meter}\n"
-            f"Число строк в каждом: {params.n_lines}\n"
+            f"Число строк в каждом: {n_lines}\n"
             f"Схема рифмовки: {params.scheme}\n"
-            f"Каждый вариант — ровно {params.n_lines} строк, строки разделяй '\\n'. "
+            f"Каждый вариант — ровно {n_lines} строк, строки разделяй '\\n'. "
             f"Добивайся точной рифмы по схеме {params.scheme}."
         )
+        demands = Techniques.demands_text(params.techniques)
+        if demands:                                     # техника важнее темы
+            user = ("ТРЕБОВАНИЯ К ТЕХНИКЕ (нарушать нельзя, они проверяются "
+                    f"автоматически):\n{demands}\n\n" + user)
         if params.spec is not None:                     # глубокий режим: пишем по карте
             user = (
                 "Ты пишешь не по теме, а по готовому замыслу. Следуй ему.\n\n"
@@ -139,7 +145,8 @@ class LLMGenerator(Generator):
         улучшения — менять его промпт значило бы менять и ту кнопку."""
         user = Roles.rework_prompt(text, claims, params.meter, params.scheme,
                                    params.n_lines,
-                                   spec.to_prompt() if spec else "")
+                                   spec.to_prompt() if spec else "",
+                                   Techniques.demands_text(params.techniques))
         user += " Верни JSON с одним полем poem (строки через '\\n')."
         data = self._ask(user, Roles.POEM_SCHEMA,
                          max_tokens=400 + 120 * params.n_lines)

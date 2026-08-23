@@ -108,13 +108,15 @@ def judge_prompt(text: str, spec_text: str = "") -> str:
 
 
 def rework_prompt(text: str, claims: str, meter: str, scheme: str,
-                  n_lines: int, spec_text: str = "") -> str:
+                  n_lines: int, spec_text: str = "", demands: str = "") -> str:
     return (
         "Перепиши стихотворение, починив ТОЛЬКО перечисленное. Остальное "
         "сохрани дословно: удачные строки не трогай.\n\n"
         f"СТИХ:\n{text}\n\n"
         f"ЧТО ПОЧИНИТЬ:\n{claims}\n\n"
         + (f"ЗАМЫСЕЛ:\n{spec_text}\n\n" if spec_text else "")
+        + (f"ТРЕБОВАНИЯ К ТЕХНИКЕ, которые обязаны остаться выполненными:\n"
+           f"{demands}\n\n" if demands else "")
         + f"Сохрани размер {meter}, схему рифмовки {scheme} и ровно {n_lines} "
         "строк. Не добавляй вывод и мораль в финале."
     )

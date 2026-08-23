@@ -2,7 +2,7 @@
 import os
 import random
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass
@@ -13,6 +13,7 @@ class GenParams:
     meter: str = "ямб"       # желаемый размер
     scheme: str = "ABAB"     # желаемая схема рифмовки
     spec: object = None      # PoemSpec: карта смысла; заглушка её игнорирует
+    techniques: list = field(default_factory=list)   # [{id, param}] — твёрдые требования
 
 
 class Generator(ABC):

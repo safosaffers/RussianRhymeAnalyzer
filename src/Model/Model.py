@@ -10,6 +10,7 @@ from Model.OpenAICompatGenerator import OpenAICompatGenerator
 from Model.RhymeEvaluator import RhymeEvaluator
 from Model.YukawaDetector import YukawaDetector
 from Model.RhymeFeedback import rhyme_feedback, needs_rhyme_fix
+from Model.Techniques import check_all
 from Model.Pipeline import compose
 
 
@@ -76,8 +77,21 @@ class Model:
         return det.evaluate(text, scheme)
 
     def evaluate(self, text: str, target_scheme: str = "ABAB",
-                 method: str = "yukawa", yk_params: dict = None) -> dict:
-        return self._score(self._detector(method), text, target_scheme, yk_params)
+                 method: str = "yukawa", yk_params: dict = None,
+                 techniques: list = None) -> dict:
+        """Оценка стиха. Требования к технике проверяются здесь же: заданная
+        техника обязана выдерживаться и на вкладке оценки, а не только при
+        генерации."""
+        m = self._score(self._detector(method), text, target_scheme, yk_params)
+        m["techniques"] = check_all(text, techniques)
+        return m
+
+    @staticmethod
+    def _rank(item) -> tuple:
+        """Порядок best-of-N: сначала те, у кого техника выдержана, потом рифма.
+        Без требований all([]) истинно у всех — остаётся сортировка по рифме."""
+        _, m = item
+        return (all(r["ok"] for r in m.get("techniques", [])), m["rhyme_score"])
 
     def improve_poem(self, text: str, params: GenParams, method: str = "yukawa",
                      yk_params: dict = None):
@@ -129,8 +143,12 @@ class Model:
         det = self._detector(method)
         gen = self.llm if (use_llm and self.llm) else self.stub
         cands = gen.generate(params, n)
-        scored = [(c, self._score(det, c, params.scheme, yk_params)) for c in cands]
-        scored.sort(key=lambda x: x[1]["rhyme_score"], reverse=True)
+        scored = []
+        for c in cands:
+            m = self._score(det, c, params.scheme, yk_params)
+            m["techniques"] = check_all(c, params.techniques)
+            scored.append((c, m))
+        scored.sort(key=self._rank, reverse=True)
 
         if use_llm and self.llm and scored:
             best_text, best_m = scored[0]
@@ -139,7 +157,8 @@ class Model:
                 improved = self.llm.improve(best_text, feedback, params)
                 if improved:
                     im = self._score(det, improved, params.scheme, yk_params)
+                    im["techniques"] = check_all(improved, params.techniques)
                     im["corrected"] = True
                     scored.append((improved, im))
-                    scored.sort(key=lambda x: x[1]["rhyme_score"], reverse=True)
+                    scored.sort(key=self._rank, reverse=True)
         return scored
