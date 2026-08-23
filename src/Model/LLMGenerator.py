@@ -39,10 +39,17 @@ class LLMGenerator(Generator):
         except ImportError:
             return False
 
+    # Цепочка вызовов на один стих длинная, поэтому ограничиваем ожидание:
+    # у SDK по умолчанию 10 минут на запрос и 2 повтора, то есть до получаса
+    # молчания на одном шаге.
+    TIMEOUT_S = 120.0
+    MAX_RETRIES = 2
+
     def _ensure(self):
         if self._client is None:
             import anthropic
-            self._client = anthropic.Anthropic()   # ключ из ANTHROPIC_API_KEY
+            self._client = anthropic.Anthropic(   # ключ из ANTHROPIC_API_KEY
+                timeout=self.TIMEOUT_S, max_retries=self.MAX_RETRIES)
 
     @staticmethod
     def _system() -> list:
