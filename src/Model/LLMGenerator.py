@@ -5,6 +5,7 @@ import os
 from Model.Generator import Generator, GenParams
 from Model.Poetics import poetics_text
 from Model.PoemSpec import PoemSpec, SCHEMA as SPEC_SCHEMA
+from Model import Roles
 
 # по умолчанию — самая способная модель; можно переопределить через окружение
 DEFAULT_MODEL = os.environ.get("RHYMER_MODEL", "claude-opus-4-8")
@@ -87,90 +88,22 @@ class LLMGenerator(Generator):
         text = next((b.text for b in resp.content if b.type == "text"), "{}")
         return json.loads(text)
 
-    # Рубрика §11: десять критериев по 0-3 балла, максимум 30.
-    RUBRIC = {
-        "occasion": "есть ли повод: почему это сказано именно сейчас",
-        "stakes": "что поставлено на карту, что теряется",
-        "concretion": "конкретные предметы против отвлечённых слов",
-        "figuration": "работают ли образы и сравнения, нет ли стёртых",
-        "tension": "есть ли сила, тянущая в другую сторону",
-        "turn": "есть ли поворот, узнаёт ли стих что-то к концу",
-        "voice": "цельность голоса, соответствие говорящему",
-        "form": "оправданы ли строки и строфы, работает ли разбивка",
-        "closure": "финал завершает, не объясняя",
-        "surprise": "есть ли непредсказуемость, не собран ли стих из готового",
-    }
-    JUDGE_SCHEMA = {
-        "type": "object",
-        "properties": {
-            "scores": {
-                "type": "object",
-                "properties": {k: {"type": "integer"} for k in RUBRIC},
-                "required": list(RUBRIC),
-                "additionalProperties": False,
-            },
-            "total": {"type": "integer"},
-            "issues": {
-                "type": "array",
-                "items": {
-                    "type": "object",
-                    "properties": {
-                        "line": {"type": "integer"},
-                        "symptom": {"type": "string"},
-                        "fix": {"type": "string"},
-                    },
-                    "required": ["line", "symptom", "fix"],
-                    "additionalProperties": False,
-                },
-            },
-            "verdict": {"type": "string"},
-        },
-        "required": ["scores", "total", "issues", "verdict"],
-        "additionalProperties": False,
-    }
-
     def judge(self, text: str, spec: PoemSpec = None) -> dict:
         """Смысловая оценка по рубрике: баллы, адресные претензии, вердикт.
 
         Отдельный вызов, а не продолжение диалога с генератором: модель,
         которая оценивает собственный черновик в том же контексте, завышает
         балл. Оценивается один текст — формальный отбор по рифме уже сделан."""
-        rubric = "\n".join(f"- {k}: {v}" for k, v in self.RUBRIC.items())
-        user = (
-            "Сейчас ты не пишешь стих, а оцениваешь чужой. Будь строгим: "
-            "средний балл по критерию — 1, три ставится только за то, что "
-            "действительно работает.\n\n"
-            f"СТИХ:\n{text}\n\n"
-            + (f"ЗАМЫСЕЛ, по которому он писался:\n{spec.to_prompt()}\n\n" if spec else "")
-            + f"Оцени по каждому критерию от 0 до 3:\n{rubric}\n\n"
-            "total — сумма баллов. issues — конкретные претензии: line (номер "
-            "строки, 0 если про весь стих), symptom (что не так, словами из "
-            "свода правил), fix (что именно сделать). Не больше пяти претензий, "
-            "самые важные. verdict — одно предложение о стихе в целом."
-        )
-        return self._ask(user, self.JUDGE_SCHEMA, max_tokens=1500)
+        user = Roles.judge_prompt(text, spec.to_prompt() if spec else "")
+        return Roles.normalize_report(
+            self._ask(user, Roles.JUDGE_SCHEMA, max_tokens=1500))
 
     def plan(self, params: GenParams) -> PoemSpec:
         """Карта стиха до генерации: замысел, говорящий, сцена.
 
         Роль задаётся в сообщении пользователя, а не в system: системный
         префикс общий для всех ролей и потому кешируется целиком."""
-        theme = params.theme.strip() or "свободная тема"
-        user = (
-            "Сейчас ты не пишешь стих, а готовишь замысел. Верни карту будущего "
-            f"стихотворения на тему: {theme}.\n"
-            "Требования к карте:\n"
-            "- thought: одна мысль одним предложением, без красивостей;\n"
-            "- occasion: что заставило говорить именно сейчас (событие, час, место);\n"
-            "- objects: 4-6 конкретных предметов и деталей, которые можно потрогать "
-            "или увидеть; никаких отвлечённых слов;\n"
-            "- motion: режим движения (медитативный, аргументативный, ассоциативный, "
-            "каталог, сопоставление) и в какой примерно строке перелом;\n"
-            "- speaker: живой человек с возрастом, занятием и усталостью, а не «поэт»;\n"
-            "- scene: где и когда он это произносит, что у него перед глазами;\n"
-            "- punchline: чем кончается, без морали и без объясняющей строки;\n"
-            "- forbidden: 3-5 слов, которых этот говорящий не скажет."
-        )
+        user = Roles.plan_prompt(params.theme.strip() or "свободная тема")
         return PoemSpec.from_dict(self._ask(user, SPEC_SCHEMA, max_tokens=1200))
 
     def generate(self, params: GenParams, n: int) -> list[str]:
@@ -204,23 +137,12 @@ class LLMGenerator(Generator):
 
         Отдельно от improve(): тот чинит только рифму и вызывается из ручного
         улучшения — менять его промпт значило бы менять и ту кнопку."""
-        user = (
-            "Перепиши стихотворение, починив ТОЛЬКО перечисленное. Остальное "
-            "сохрани дословно: удачные строки не трогай.\n\n"
-            f"СТИХ:\n{text}\n\n"
-            f"ЧТО ПОЧИНИТЬ:\n{claims}\n\n"
-            + (f"ЗАМЫСЕЛ:\n{spec.to_prompt()}\n\n" if spec else "")
-            + f"Сохрани размер {params.meter}, схему рифмовки {params.scheme} и "
-            f"ровно {params.n_lines} строк. Не добавляй вывод и мораль в финале. "
-            "Верни JSON с одним полем poem (строки через '\\n')."
-        )
-        schema = {
-            "type": "object",
-            "properties": {"poem": {"type": "string"}},
-            "required": ["poem"],
-            "additionalProperties": False,
-        }
-        data = self._ask(user, schema, max_tokens=400 + 120 * params.n_lines)
+        user = Roles.rework_prompt(text, claims, params.meter, params.scheme,
+                                   params.n_lines,
+                                   spec.to_prompt() if spec else "")
+        user += " Верни JSON с одним полем poem (строки через '\\n')."
+        data = self._ask(user, Roles.POEM_SCHEMA,
+                         max_tokens=400 + 120 * params.n_lines)
         return (data.get("poem") or "").strip()
 
     def improve(self, text: str, feedback: str, params: GenParams) -> str:
